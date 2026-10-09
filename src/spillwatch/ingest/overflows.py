@@ -5,6 +5,7 @@ history is built by polling regularly and storing every snapshot.
 """
 
 import logging
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -28,6 +29,8 @@ FIELD_MAP = {
     "lastupdated": "last_updated",
 }
 DATE_COLUMNS = ["status_start", "latest_event_start", "latest_event_end", "last_updated"]
+MIN_EPOCH_MS = 946_684_800_000    # 2000-01-01
+MAX_EPOCH_MS = 4_102_444_800_000  # 2100-01-01
 OUTPUT_COLUMNS = ["overflow_id", "company", *FIELD_MAP.values(), "snapshot_at"]
 
 
@@ -78,12 +81,53 @@ def normalise(rows: list[dict], company: str, snapshot_at: datetime) -> pd.DataF
     df["overflow_id"] = company + ":" + df["site_id"]
     df["status"] = pd.to_numeric(df["status"], errors="coerce").astype("Int64")
     for col in DATE_COLUMNS:
-        # ArcGIS returns dates as epoch milliseconds (UTC)
-        df[col] = pd.to_datetime(pd.to_numeric(df[col], errors="coerce"), unit="ms", utc=True)
+        # ArcGIS returns dates as epoch milliseconds (UTC). Feeds caught mid-refresh
+        # have returned garbage values, so anything outside 2000-2100 becomes NaT.
+        millis = pd.to_numeric(df[col], errors="coerce")
+        millis = millis.where(millis.between(MIN_EPOCH_MS, MAX_EPOCH_MS))
+        # Convert via nullable Int64: pandas 2.3's float path can raise a spurious
+        # FloatingPointError on columns containing NaN.
+        df[col] = pd.to_datetime(millis.astype("Int64"), unit="ms", utc=True)
     df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
     df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
     df["snapshot_at"] = pd.Timestamp(snapshot_at)
+
+    # Some feeds list a site more than once (e.g. Severn Trent keeps stale copies);
+    # keep the most recently updated row per site.
+    before = len(df)
+    df = (df.sort_values("last_updated", ascending=False, na_position="last")
+            .drop_duplicates("overflow_id", keep="first")
+            .sort_index())
+    if len(df) < before:
+        log.warning("%s: removed %d duplicate site rows from source feed", company, before - len(df))
     return df[OUTPUT_COLUMNS]
+
+
+def fetch_layer_consistent(session: requests.Session, layer_url: str, attempts: int = 3) -> list[dict]:
+    """Fetch a layer and verify the pages formed one complete, non-overlapping read.
+
+    Offset paging over a table that changes mid-read can return overlapping pages
+    (repeated row ids) and silently skip others. Every row has a unique ArcGIS object
+    id, so the read is valid only if the unique object ids match the server's count.
+    """
+    for attempt in range(1, attempts + 1):
+        expected = session.get(
+            f"{layer_url}/query",
+            params={"where": "1=1", "returnCountOnly": "true", "f": "json"},
+            timeout=HTTP_TIMEOUT,
+        ).json().get("count")
+        rows = fetch_layer(session, layer_url)
+        unique_rows = len({_object_id(r) for r in rows})
+        if unique_rows == expected == len(rows):
+            return rows
+        log.warning("%s: inconsistent read (expected %s, got %d rows / %d unique), attempt %d",
+                    layer_url.split("/services/")[1].split("/")[0], expected, len(rows), unique_rows, attempt)
+        time.sleep(10 * attempt)
+    raise RuntimeError(f"Could not get a consistent read of {layer_url}")
+
+
+def _object_id(row: dict):
+    return next((v for k, v in row.items() if k.lower() in ("objectid", "fid")), None)
 
 
 def collect_snapshot(session: requests.Session, feeds: dict[str, str] = OVERFLOW_FEEDS) -> pd.DataFrame:
@@ -91,12 +135,13 @@ def collect_snapshot(session: requests.Session, feeds: dict[str, str] = OVERFLOW
     snapshot_at = datetime.now(timezone.utc).replace(microsecond=0)
     frames = []
     for company, url in feeds.items():
+        # One company's bad data must never stop the others being collected
         try:
-            rows = fetch_layer(session, url)
+            rows = fetch_layer_consistent(session, url)
+            df = normalise(rows, company, snapshot_at)
         except Exception:
-            log.exception("Failed to fetch %s", company)
+            log.exception("Failed to collect %s", company)
             continue
-        df = normalise(rows, company, snapshot_at)
         log.info("%-18s %5d overflows, %3d spilling", company, len(df), int((df["status"] == 1).sum()))
         frames.append(df)
     if not frames:

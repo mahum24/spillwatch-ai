@@ -42,3 +42,12 @@ def test_rainfall_finalise_cleans_values():
     df = _finalise(raw)
     assert list(df["rain_mm"]) == [0.2, 0.4]          # revised value split, fault + junk dropped
     assert set(df["station_id"]) == {"E7050"}
+
+
+def test_normalise_nulls_out_of_range_timestamps():
+    row = {"Id": "X1", "Status": 0, "LatestEventStart": 9.9e17, "LatestEventEnd": -5,
+           "LastUpdated": 1760000000000}
+    df = normalise([row], "severn_trent", SNAP)
+    assert pd.isna(df.loc[0, "latest_event_start"])
+    assert pd.isna(df.loc[0, "latest_event_end"])
+    assert df.loc[0, "last_updated"].year == 2025
