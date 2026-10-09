@@ -1,0 +1,22 @@
+[project]
+name = "spillwatch"
+version = "0.1.0"
+description = "AI system that detects suspicious sewage discharges and forecasts spills in England's rivers and seas"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31", "pandas>=2.1", "pyarrow>=14", "duckdb>=1.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+spillwatch = "spillwatch.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
