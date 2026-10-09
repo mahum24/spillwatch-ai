@@ -18,8 +18,8 @@ England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million 
 ## Architecture (Phase 1)
 
 ```
-8 water-company ArcGIS feeds ─┐                     ┌─ dim_overflows
-  (~13,200 overflows, live)   ├─► raw parquet ──►   ├─ fct_spill_events
+9 water-company ArcGIS feeds ─┐                     ┌─ dim_overflows
+  (~14,200 overflows, live)   ├─► raw parquet ──►   ├─ fct_spill_events
 EA rainfall API + archive ────┘   landing zone      ├─ bridge_overflow_gauge (≤3 gauges within 10 km)
   (~1,000 gauges, 15-min)          + DuckDB raw     └─ fct_event_rainfall (+ baseline dry-spill rule)
 ```
@@ -36,7 +36,7 @@ EA rainfall API + archive ────┘   landing zone      ├─ bridge_over
 | Water company Storm Overflow Activity feeds (National Storm Overflow Hub) | Live status and latest event for each overflow | Open data |
 | [Environment Agency flood-monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference) | 15-minute rainfall from ~1,000 gauges, plus daily archive | Open Government Licence v3 |
 
-Not yet covered: Southern Water, Welsh Water / Hafren Dyfrdwy (no matching feed found yet).
+Covers all 9 English water and sewerage companies (~14,200 overflows). Not yet covered: Welsh Water / Hafren Dyfrdwy.
 
 ## Quick start
 

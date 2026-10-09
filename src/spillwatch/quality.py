@@ -52,6 +52,14 @@ CHECKS = [
         description="Every company feed responded in the latest run",
     ),
     Check(
+        "stale_company_feeds",
+        f"""SELECT COUNT(*) FROM (
+                SELECT company FROM raw_overflow_snapshots WHERE snapshot_at = {LATEST}
+                GROUP BY company HAVING MAX(last_updated) < MAX(snapshot_at) - INTERVAL 24 HOUR)""",
+        warn_above=0,
+        description="Companies whose feed has not been updated by the company in 24h",
+    ),
+    Check(
         "minutes_since_last_snapshot",
         f"SELECT DATE_DIFF('minute', {LATEST}, now())",
         warn_above=20, fail_above=60,

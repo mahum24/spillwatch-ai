@@ -42,3 +42,19 @@ Record significant technical decisions here, with the evidence behind them. This
 **Decision:** 11 SQL checks with pass/warn/fail thresholds (`src/spillwatch/quality.py`), stored in `dq_results`.
 **Evidence:** The first run found 5 overflows whose latest event end precedes its start (stale end times in the source feeds). Checks also cover feed completeness, row-count drops, coordinates, freshness and rainfall coverage (77% of expected 15-min readings over 7 days).
 **Why it matters for the AI:** a dry-spill prediction is only as trustworthy as the data behind it. DQ history will be used to exclude unreliable sites and periods from training.
+
+### 2026-10-09 — Hardening ingestion after three real failures
+Three problems surfaced within an hour of running against live data. Each was found by the data-quality checks or row-count reconciliation, not by luck.
+
+1. **Severn Trent listed 412 sites twice** (same site id, different row ids and `LastUpdated`) during a refresh.
+   *First diagnosis (wrong):* overlapping pagination. *Evidence that disproved it:* all 2,416 rows had unique ArcGIS object ids.
+   *Fix:* pagination is now validated on unique object ids vs the server's count (refetch up to 3×), and duplicate sites are resolved by keeping the most recently updated row. Anglian has 1 genuine duplicate in every run, handled the same way.
+2. **Timestamp conversion crashed the whole run.**
+   *First diagnosis (wrong):* garbage timestamps from a feed mid-refresh. *Evidence that disproved it:* all values were in range; only one of several float columns with NaNs failed.
+   *Root cause:* pandas 2.3.3 / numpy 2.2 raise a spurious `FloatingPointError` when converting float epoch-ms with NaN. *Fix:* convert via nullable `Int64`; out-of-range values still become NaT as a safeguard.
+3. **One company's failure stopped every company.** *Fix:* fetch + normalise are isolated per company; a failure is logged and caught by the `companies_in_latest_snapshot` check.
+
+**Lesson (for reflection):** twice my first hypothesis was wrong; checking it against the data before fixing avoided shipping the wrong fix.
+
+### 2026-10-09 — Added Southern Water
+Found its live feed (994 overflows), bringing coverage to all 9 English water and sewerage companies (14,199 overflows). Added a `stale_company_feeds` check because its `LastUpdated` appeared months old when first probed.
