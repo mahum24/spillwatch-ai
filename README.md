@@ -60,7 +60,7 @@ python3 -m venv .venv
 Spill history only exists if the feeds are polled regularly. To collect every 15 minutes with cron (`crontab -e`):
 
 ```
-*/15 * * * * "/Users/mac/Documents/Advance Practice/spillwatch-ai/scripts/collect.sh"
+7,22,37,52 * * * * "/Users/mac/Documents/Advance Practice/spillwatch-ai/scripts/collect.sh"
 ```
 
 ## Research pipeline (Phase 3)
