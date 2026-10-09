@@ -7,15 +7,21 @@
     python -m spillwatch.cli check [--strict]     # run data-quality checks
     python -m spillwatch.cli health               # pipeline + data-quality status
     python -m spillwatch.cli summary              # quick look at what's in the warehouse
+    python -m spillwatch.cli history [--source S] # download historical spill events
+    python -m spillwatch.cli rain-history         # download daily rainfall history
+    python -m spillwatch.cli build-research       # build the site-day modelling table
+    python -m spillwatch.cli train                # train + evaluate the suspicious-spill model
 """
 
 import argparse
+import json
 import logging
 from datetime import date, datetime, timedelta, timezone
 
 from spillwatch import quality, warehouse
 from spillwatch.http import make_session
-from spillwatch.ingest import overflows, rainfall
+from spillwatch.config import HISTORY_SOURCES
+from spillwatch.ingest import history, hydrology, overflows, rainfall
 
 log = logging.getLogger("spillwatch")
 
@@ -121,6 +127,44 @@ def cmd_health(con, _session, _args):
         """))
 
 
+def cmd_history(_con, session, args):
+    sources = [args.source] if args.source else list(HISTORY_SOURCES)
+    for source in sources:
+        rows = history.download_source(session, source, force=args.force)
+        log.info("%s: %d events saved", source, rows)
+
+
+def cmd_rain_history(_con, session, args):
+    hydrology.download_all(session, force=args.force)
+
+
+def cmd_build_research(_con, _session, _args):
+    import duckdb
+
+    from spillwatch.config import RAW_DIR, RESEARCH_DB_PATH, SQL_DIR
+
+    sql = (SQL_DIR / "research.sql").read_text().replace("{raw}", str(RAW_DIR))
+    con = duckdb.connect(str(RESEARCH_DB_PATH))
+    try:
+        con.execute(sql)
+        print(con.sql("""
+            SELECT company, COUNT(DISTINCT site_id) AS sites, MIN(rain_day) AS first_day,
+                   MAX(rain_day) AS last_day, COUNT(*) AS site_days,
+                   SUM(spill_started::INT) AS spill_days,
+                   ROUND(100 * AVG(CASE WHEN gauges > 0 THEN 1 ELSE 0 END), 1) AS pct_with_rain
+            FROM site_day GROUP BY company ORDER BY company
+        """))
+    finally:
+        con.close()
+
+
+def cmd_train(_con, _session, _args):
+    from spillwatch.ml import dry_spill
+
+    res = dry_spill.run()
+    print(json.dumps({"data": res.data, "prediction": res.prediction}, indent=2))
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -162,7 +206,14 @@ COMMANDS = {
     "check": cmd_check,
     "health": cmd_health,
     "summary": cmd_summary,
+    "history": cmd_history,
+    "rain-history": cmd_rain_history,
+    "build-research": cmd_build_research,
+    "train": cmd_train,
 }
+
+# Research commands use their own files/database and never lock the live warehouse
+RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train"}
 
 
 def main(argv=None):
@@ -170,6 +221,7 @@ def main(argv=None):
     parser.add_argument("command", choices=COMMANDS)
     parser.add_argument("--days", type=int, default=7, help="days of rainfall to backfill")
     parser.add_argument("--force", action="store_true", help="re-download days already loaded")
+    parser.add_argument("--source", choices=HISTORY_SOURCES, help="history: one source only")
     parser.add_argument("--strict", action="store_true", help="exit non-zero if any check fails")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -178,6 +230,9 @@ def main(argv=None):
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    if args.command in RESEARCH_COMMANDS:
+        COMMANDS[args.command](None, make_session(), args)
+        return
     con = warehouse.connect()
     try:
         COMMANDS[args.command](con, make_session(), args)

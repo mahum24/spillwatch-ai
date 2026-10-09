@@ -32,3 +32,43 @@ STATUS_LABELS = {-1: "offline", 0: "stopped", 1: "spilling"}
 
 HTTP_TIMEOUT = 60
 USER_AGENT = "SpillWatch-AI/0.1 (MSc research project; open data)"
+
+# ---------------------------------------------------------------------------
+# Research (Phase 3): historical spill events + daily rainfall for model training.
+# Kept in a separate DuckDB file so long downloads never block the live collector.
+RESEARCH_DB_PATH = DATA_DIR / "research.duckdb"
+
+# EA Hydrology API: quality-checked daily rainfall totals per gauge, back to 2020+.
+# A daily total dated D covers the "rain day" 09:00 on D to 09:00 on D+1 (GMT).
+HYDRO_BASE = "https://environment.data.gov.uk/hydrology"
+RAIN_HISTORY_START = "2020-01-01"
+
+# Event-level spill history published by water companies (one row per spill).
+# Field names and time formats differ per source, so each declares its own mapping.
+_EDM = "https://services-eu1.arcgis.com/XxS6FebPX29TRGDJ/arcgis/rest/services"
+_STD = {"site": "SiteId", "start": "EventStart", "end": "EventEnd",
+        "lat": "OutfallLatitude", "lon": "OutfallLongitude", "time_format": None}
+HISTORY_SOURCES = {
+    "northumbrian_2020_2024": {
+        "company": "northumbrian",
+        "url": f"{_EDM}/EDM_Spill_Data_Northumbrian_Water_2020_2023/FeatureServer/0",
+        "site": "Monitor_Unique_ID", "start": "Event_start", "end": "Event_end",
+        "lat": "Outfall_Latitude", "lon": "Outfall_Longitude",
+        # Assumed UK local time (not stated by the publisher)
+        "time_format": "%d/%m/%Y %H:%M", "timezone": "Europe/London",
+    },
+    "united_utilities_2023": {"company": "united_utilities", **_STD,
+        "url": f"{_EDM}/United_Utilities_Event_Duration_Monitoring_2023/FeatureServer/0"},
+    "united_utilities_2024": {"company": "united_utilities", **_STD,
+        "url": f"{_EDM}/United_Utilities_Event_Duration_Monitoring_2024/FeatureServer/0"},
+    "united_utilities_2025": {"company": "united_utilities", **_STD,
+        "url": f"{_EDM}/United_Utilities_Event_Duration_Monitoring_2025/FeatureServer/0"},
+    "severn_trent_2025": {"company": "severn_trent", **_STD,
+        "url": f"{_EDM}/STW_Edm_2025/FeatureServer/0"},
+    "wessex_2025": {"company": "wessex", **_STD,
+        "url": "https://services.arcgis.com/3SZ6e0uCvPROr4mS/arcgis/rest/services/Wessex_Water_Event_Duration_Monitoring_2025_view/FeatureServer/0"},
+    "wessex_2026": {"company": "wessex", **_STD,
+        "url": "https://services.arcgis.com/3SZ6e0uCvPROr4mS/arcgis/rest/services/Wessex_Water_Event_Duration_Monitoring_2026_view2/FeatureServer/0"},
+    "yorkshire_2026": {"company": "yorkshire", **_STD,
+        "url": "https://services-eu1.arcgis.com/1WqkK5cDKUbF0CkH/arcgis/rest/services/Event%20Duration%20Monitoring%20History/FeatureServer/0"},
+}
