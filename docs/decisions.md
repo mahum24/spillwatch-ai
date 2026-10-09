@@ -95,3 +95,7 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 ### 2026-10-09 — Evaluating without ground truth
 **Decision:** Inject synthetic weather-independent spills into held-out data; compare methods at the same flagging budget; report recall broken down by weather band.
 **Evidence:** Overall recall was a tie (~38% for rule, model and rain-ranking), because random injections fall mostly on dry days. The weather-band breakdown revealed the real difference: in light rain the rule recovers 0% by design, the model ~30%. Full results: `docs/results/phase3_dry_spill.md`.
+
+### 2026-10-09 — Collect at :07/:22/:37/:52, not on the quarter hour
+**Evidence:** South West Water's feed failed at 22:30 (1,000 of 1,342 sites) and 23:00 (count 1,342 but 0 rows returned), both exactly on the half hour, and was fine minutes later. This suggests they reload on a :00/:30 schedule.
+**Decision:** Offset collection by 7 minutes to avoid reload windows. Watch `companies_in_latest_snapshot` to confirm the failures stop.
