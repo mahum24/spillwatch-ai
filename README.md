@@ -9,8 +9,8 @@ England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million 
 | Phase | Scope | Status |
 |---|---|---|
 | 1. Data pipeline | Live overflow + rainfall ingestion, DuckDB warehouse, spill events, rain-gauge matching, baseline dry-spill rule | ✅ Done |
-| 2. Orchestration & quality | Scheduled collection, data-quality checks, monitor-uptime tracking | ⏳ Next |
-| 3. AI: suspicious-spill detection | Per-site model of expected spilling given rainfall, anomaly scoring vs the baseline rule | |
+| 2. Orchestration & quality | Scheduled collection, 11 data-quality checks, collector gaps, monitor status changes | ✅ Done |
+| 3. AI: suspicious-spill detection | Per-site model of expected spilling given rainfall, anomaly scoring vs the baseline rule | ⏳ Next |
 | 4. AI: spill forecasting | 24–48h spill probability from rainfall forecasts | |
 | 5. AI: river assistant | LLM answering questions over the warehouse | |
 | 6. Frontend | Live map, suspicious spills, swim-safety forecast, impact dashboard | |
@@ -48,6 +48,8 @@ python3 -m venv .venv
 .venv/bin/spillwatch collect                # one live snapshot of overflows + rainfall
 .venv/bin/spillwatch backfill-rain --days 30
 .venv/bin/spillwatch transform              # build modelled tables
+.venv/bin/spillwatch check                  # data-quality checks
+.venv/bin/spillwatch health                 # pipeline + data-quality status
 .venv/bin/spillwatch summary
 
 .venv/bin/pytest
@@ -60,6 +62,10 @@ Spill history only exists if the feeds are polled regularly. To collect every 15
 ```
 */15 * * * * "/Users/mac/Documents/Advance Practice/spillwatch-ai/scripts/collect.sh"
 ```
+
+## Data quality
+
+After every collection, 11 checks run (`src/spillwatch/quality.py`) and are stored in `dq_results`: feed completeness, row-count stability, duplicate ids, coordinate validity, offline monitors, inconsistent event times, future timestamps, rainfall freshness and coverage. `fct_collection_gaps` records any time the collector missed a run, so the completeness of spill history is always known.
 
 ## Known limitations
 

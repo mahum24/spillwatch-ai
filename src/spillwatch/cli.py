@@ -4,6 +4,8 @@
     python -m spillwatch.cli stations             # refresh rain gauge locations
     python -m spillwatch.cli backfill-rain --days 14
     python -m spillwatch.cli transform            # rebuild modelled tables
+    python -m spillwatch.cli check [--strict]     # run data-quality checks
+    python -m spillwatch.cli health               # pipeline + data-quality status
     python -m spillwatch.cli summary              # quick look at what's in the warehouse
 """
 
@@ -11,7 +13,7 @@ import argparse
 import logging
 from datetime import date, datetime, timedelta, timezone
 
-from spillwatch import warehouse
+from spillwatch import quality, warehouse
 from spillwatch.http import make_session
 from spillwatch.ingest import overflows, rainfall
 
@@ -81,6 +83,37 @@ def cmd_transform(con, _session, _args):
     _run_job(con, "transform", lambda: (warehouse.run_models(con), 0)[1])
 
 
+def cmd_check(con, _session, args):
+    results = quality.run_checks(con)
+    failed = [r["check_name"] for r in results if r["status"] == "fail"]
+    if failed and args.strict:
+        raise SystemExit(f"Data-quality checks failed: {', '.join(failed)}")
+
+
+def cmd_health(con, _session, _args):
+    print("Latest data-quality results:")
+    print(con.sql("""
+        SELECT check_name, ROUND(value, 2) AS value, status
+        FROM dq_results WHERE checked_at = (SELECT MAX(checked_at) FROM dq_results)
+        ORDER BY CASE status WHEN 'fail' THEN 0 WHEN 'warn' THEN 1 ELSE 2 END, check_name
+    """))
+    print("Pipeline runs (last 24h):")
+    print(con.sql("""
+        SELECT split_part(job, ':', 1) AS job, COUNT(*) AS runs,
+               COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+               SUM(rows_loaded) AS rows_loaded, MAX(finished_at) AS last_run
+        FROM pipeline_runs WHERE started_at > now() - INTERVAL 24 HOUR
+        GROUP BY 1 ORDER BY 1
+    """))
+    tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+    if "fct_collection_gaps" in tables:
+        print("Collector gaps over 20 minutes:")
+        print(con.sql("""
+            SELECT previous_snapshot_at, snapshot_at, gap_minutes
+            FROM fct_collection_gaps WHERE gap_minutes > 20 ORDER BY snapshot_at DESC LIMIT 10
+        """))
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -119,6 +152,8 @@ COMMANDS = {
     "stations": cmd_stations,
     "backfill-rain": cmd_backfill_rain,
     "transform": cmd_transform,
+    "check": cmd_check,
+    "health": cmd_health,
     "summary": cmd_summary,
 }
 
@@ -128,6 +163,7 @@ def main(argv=None):
     parser.add_argument("command", choices=COMMANDS)
     parser.add_argument("--days", type=int, default=7, help="days of rainfall to backfill")
     parser.add_argument("--force", action="store_true", help="re-download days already loaded")
+    parser.add_argument("--strict", action="store_true", help="exit non-zero if any check fails")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
 

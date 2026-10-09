@@ -96,3 +96,22 @@ UPDATE fct_event_rainfall SET is_dry_spill_rule = CASE
     WHEN NOT has_rain_data THEN NULL
     ELSE rain_48h_before_mm + COALESCE(rain_during_mm, 0) < 0.25
 END;
+
+-- Collector health: gap since the previous snapshot. Gaps > 20 min mean events
+-- may have been missed, so they bound the completeness of fct_spill_events.
+CREATE OR REPLACE TABLE fct_collection_gaps AS
+WITH snaps AS (SELECT DISTINCT snapshot_at FROM raw_overflow_snapshots)
+SELECT snapshot_at,
+       LAG(snapshot_at) OVER (ORDER BY snapshot_at) AS previous_snapshot_at,
+       DATE_DIFF('minute', LAG(snapshot_at) OVER (ORDER BY snapshot_at), snapshot_at) AS gap_minutes
+FROM snaps;
+
+-- Monitor status changes per overflow (online <-> offline <-> spilling), used to
+-- measure monitor reliability and to exclude unreliable sites from training data.
+CREATE OR REPLACE TABLE fct_status_changes AS
+WITH s AS (
+    SELECT overflow_id, company, snapshot_at, status,
+           LAG(status) OVER (PARTITION BY overflow_id ORDER BY snapshot_at) AS previous_status
+    FROM raw_overflow_snapshots
+)
+SELECT * FROM s WHERE previous_status IS DISTINCT FROM status AND previous_status IS NOT NULL;
