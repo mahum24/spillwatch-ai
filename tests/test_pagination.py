@@ -63,3 +63,22 @@ def test_normalise_keeps_most_recent_duplicate():
     df = overflows.normalise(rows, "severn_trent", snap)
     assert len(df) == 2
     assert df.set_index("site_id").loc["SVT01716", "status"] == 1
+
+
+def test_partially_reloaded_feed_is_retried(monkeypatch):
+    monkeypatch.setattr(overflows.time, "sleep", lambda _s: None)
+    partial = [{"OBJECTID": i, "Id": f"S{i}"} for i in range(1000)]
+    full = [{"OBJECTID": i, "Id": f"S{i}"} for i in range(1342)]
+    with patch.object(overflows, "fetch_layer_consistent", side_effect=[partial, full]) as fetch:
+        df = overflows.collect_snapshot(None, feeds={"south_west": URL},
+                                        typical_counts={"south_west": 1342})
+    assert len(df) == 1342 and fetch.call_count == 2
+
+
+def test_genuinely_shrunk_feed_is_accepted_after_retries(monkeypatch):
+    monkeypatch.setattr(overflows.time, "sleep", lambda _s: None)
+    partial = [{"OBJECTID": i, "Id": f"S{i}"} for i in range(1000)]
+    with patch.object(overflows, "fetch_layer_consistent", return_value=partial) as fetch:
+        df = overflows.collect_snapshot(None, feeds={"south_west": URL},
+                                        typical_counts={"south_west": 1342})
+    assert len(df) == 1000 and fetch.call_count == 3

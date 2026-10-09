@@ -47,7 +47,14 @@ def cmd_stations(con, session, _args):
 
 def cmd_collect(con, session, _args):
     def overflow_job():
-        df = overflows.collect_snapshot(session)
+        # Median sites per company over the last day, to spot partially reloaded feeds
+        typical = dict(con.execute("""
+            SELECT company, MEDIAN(n)::INT FROM (
+                SELECT company, snapshot_at, COUNT(*) AS n FROM raw_overflow_snapshots
+                WHERE snapshot_at > now() - INTERVAL 24 HOUR GROUP BY ALL)
+            GROUP BY company
+        """).fetchall())
+        df = overflows.collect_snapshot(session, typical_counts=typical)
         warehouse.land_raw(df, "overflow_snapshots", df["snapshot_at"].iloc[0].to_pydatetime())
         return warehouse.insert_ignore(con, "raw_overflow_snapshots", df)
 
