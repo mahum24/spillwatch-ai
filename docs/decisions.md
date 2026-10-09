@@ -66,3 +66,32 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 1. Every request sends `Cache-Control: no-cache`.
 2. Each company is compared with its median site count over the last 24 h. Below 95% → retry after 30 s and 60 s, then accept with a warning (a company may genuinely remove sites).
 **Implication for modelling:** snapshots where a company is below 95% of typical size are flagged in the logs and must be excluded when deriving training labels; otherwise missing sites look like "not spilling".
+
+### 2026-10-09 — Phase 3 training data: event history instead of waiting
+**Decision:** Train on published event-level EDM history (Northumbrian 2020–24, United Utilities 2023–25, Severn Trent 2025, Wessex 2025–26, Yorkshire 2026; ~1.8M raw events) rather than waiting for our own live history.
+**Evidence:** Found via ArcGIS catalogue search; site ids match the live feeds (except Northumbrian, which needs spatial matching).
+
+### 2026-10-09 — Rainfall source for training: EA Hydrology API (daily)
+**Decision:** Daily, quality-checked gauge totals from the Hydrology API (991 gauges, 2020–2026).
+**Evidence:** The flood-monitoring archive used for live data only goes back ~10 months (404 before Dec 2025). Hydrology daily data covers every history source.
+**Problem met:** 756 of 995 gauge downloads returned `403 Forbidden` within one second: rate limiting from 4 parallel requests, not real access denial (the same URL returned 200 moments later). **Fix:** 2 workers, 0.3 s pause, exponential back-off on 403/429.
+
+### 2026-10-09 — Separate research database
+**Decision:** `research.duckdb`, built from parquet, separate from the live warehouse.
+**Why:** DuckDB allows one writer; long research jobs must never block the 15-minute collector.
+
+### 2026-10-09 — Harmonising how companies count spills
+**Decision:** Merge events per site separated by ≤ 30 min into continuous spells (gaps-and-islands SQL).
+**Evidence:** Median raw event length was 0.25 h for Northumbrian (15-minute blocks) vs ~3 h for Yorkshire; Wessex had 8.5 raw rows per spell. Without merging, one long spill would look like many spills, and a spill crossing 09:00 would look like a new spill the next day.
+
+### 2026-10-09 — United Utilities site-id change
+**Decision:** Map 2023 ids (`UUG…`) to 2024+ ids (`UUP…`) by location, one-to-one matches within 1 m only.
+**Evidence:** 1,884 of 1,944 old ids sit within 1 m of a new id; 1,693 are unambiguous one-to-one matches. Without this, United Utilities appeared to have 4,034 sites (live feed: 2,255); after: 2,341.
+
+### 2026-10-09 — Avoiding the "normalisation trap"
+**Decision:** Site features use wet-weather days only, computed out-of-fold; company is not a feature.
+**Why:** If the model learned each site's overall spill behaviour, a site that habitually spills in dry weather would look "normal" and never be flagged. Tests prove dry-day spills do not change site features and that no row sees its own month's labels.
+
+### 2026-10-09 — Evaluating without ground truth
+**Decision:** Inject synthetic weather-independent spills into held-out data; compare methods at the same flagging budget; report recall broken down by weather band.
+**Evidence:** Overall recall was a tie (~38% for rule, model and rain-ranking), because random injections fall mostly on dry days. The weather-band breakdown revealed the real difference: in light rain the rule recovers 0% by design, the model ~30%. Full results: `docs/results/phase3_dry_spill.md`.

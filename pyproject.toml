@@ -3,7 +3,7 @@ name = "spillwatch"
 version = "0.1.0"
 description = "AI system that detects suspicious sewage discharges and forecasts spills in England's rivers and seas"
 requires-python = ">=3.10"
-dependencies = ["requests>=2.31", "pandas>=2.1", "pyarrow>=14", "duckdb>=1.1"]
+dependencies = ["requests>=2.31", "pandas>=2.1", "pyarrow>=14", "duckdb>=1.1", "scikit-learn>=1.5"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
