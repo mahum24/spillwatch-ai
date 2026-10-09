@@ -41,3 +41,12 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
     status      VARCHAR,
     message     VARCHAR
 );
+
+-- One row per data-quality check per run (see src/spillwatch/quality.py)
+CREATE TABLE IF NOT EXISTS dq_results (
+    checked_at TIMESTAMPTZ,
+    check_name VARCHAR,
+    value      DOUBLE,
+    status     VARCHAR,      -- pass / warn / fail
+    message    VARCHAR
+);

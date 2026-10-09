@@ -32,3 +32,13 @@ Record significant technical decisions here, with the evidence behind them. This
 **Decision:** < 0.25 mm rain in the 48 h before plus during a spill = "dry spill (rule)". Missing rain data → NULL, never TRUE.
 **Why:** Mirrors the simple threshold heuristics used in public analyses. This is the benchmark the ML model must beat (RQ1).
 **To do:** cite the exact threshold definition used by the EA / campaigners in the literature review.
+
+### 2026-10-09 — Scheduling with cron (for now)
+**Decision:** cron runs `scripts/collect.sh` every 15 minutes on the laptop; a daily 06:00 run re-loads the last 2 days of rainfall archive to fill gaps.
+**Evidence:** Zero extra infrastructure; the whole run takes ~10 s. Collector gaps are measured in `fct_collection_gaps`, so downtime is visible, not silent.
+**Revisit when:** the frontend goes live — then move collection to a cloud scheduler so it runs 24/7.
+
+### 2026-10-09 — Data-quality checks after every run
+**Decision:** 11 SQL checks with pass/warn/fail thresholds (`src/spillwatch/quality.py`), stored in `dq_results`.
+**Evidence:** The first run found 5 overflows whose latest event end precedes its start (stale end times in the source feeds). Checks also cover feed completeness, row-count drops, coordinates, freshness and rainfall coverage (77% of expected 15-min readings over 7 days).
+**Why it matters for the AI:** a dry-spill prediction is only as trustworthy as the data behind it. DQ history will be used to exclude unreliable sites and periods from training.
