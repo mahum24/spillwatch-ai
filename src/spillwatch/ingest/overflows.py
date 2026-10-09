@@ -130,15 +130,34 @@ def _object_id(row: dict):
     return next((v for k, v in row.items() if k.lower() in ("objectid", "fid")), None)
 
 
-def collect_snapshot(session: requests.Session, feeds: dict[str, str] = OVERFLOW_FEEDS) -> pd.DataFrame:
-    """Fetch every feed; a failing company is logged and skipped, not fatal."""
+def collect_snapshot(
+    session: requests.Session,
+    feeds: dict[str, str] = OVERFLOW_FEEDS,
+    typical_counts: dict[str, int] | None = None,
+    retry_delays: tuple[int, ...] = (30, 60),
+) -> pd.DataFrame:
+    """Fetch every feed; a failing company is logged and skipped, not fatal.
+
+    Some companies reload their table in batches, so a read can be internally
+    consistent yet incomplete (e.g. 1,000 of 1,342 sites). If a company returns
+    fewer than 95% of its typical site count, wait and retry before accepting it.
+    """
     snapshot_at = datetime.now(timezone.utc).replace(microsecond=0)
+    typical_counts = typical_counts or {}
     frames = []
     for company, url in feeds.items():
+        typical = typical_counts.get(company)
         # One company's bad data must never stop the others being collected
         try:
-            rows = fetch_layer_consistent(session, url)
-            df = normalise(rows, company, snapshot_at)
+            for delay in (*retry_delays, None):
+                df = normalise(fetch_layer_consistent(session, url), company, snapshot_at)
+                if not typical or len(df) >= 0.95 * typical or delay is None:
+                    break
+                log.warning("%s: only %d of typically %d sites, feed may be reloading; retrying in %ds",
+                            company, len(df), typical, delay)
+                time.sleep(delay)
+            if typical and len(df) < 0.95 * typical:
+                log.warning("%s: accepted incomplete feed (%d of typically %d sites)", company, len(df), typical)
         except Exception:
             log.exception("Failed to collect %s", company)
             continue

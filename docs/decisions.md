@@ -58,3 +58,11 @@ Three problems surfaced within an hour of running against live data. Each was fo
 
 ### 2026-10-09 — Added Southern Water
 Found its live feed (994 overflows), bringing coverage to all 9 English water and sewerage companies (14,199 overflows). Added a `stale_company_feeds` check because its `LastUpdated` appeared months old when first probed.
+
+### 2026-10-09 — Incomplete feeds during company reloads (South West Water)
+**Observed:** At 22:30 South West returned exactly 1,000 of 1,342 sites, and the server's own count also said 1,000, so the pagination check could not catch it.
+**Evidence:** curl returned 1,342 while Python returned 1,000 at the same moment. Response headers showed a 5-minute ArcGIS CDN cache (`max-age=300`, `x-cache: TCP_HIT`); a `no-cache` request returned 1,342. Python and curl encode the query differently, so they hit different cache entries, and ours held a copy taken mid-reload. The feed also stayed genuinely short for several minutes, then recovered to 1,342.
+**Fixes:**
+1. Every request sends `Cache-Control: no-cache`.
+2. Each company is compared with its median site count over the last 24 h. Below 95% → retry after 30 s and 60 s, then accept with a warning (a company may genuinely remove sites).
+**Implication for modelling:** snapshots where a company is below 95% of typical size are flagged in the logs and must be excluded when deriving training labels; otherwise missing sites look like "not spilling".
