@@ -1,0 +1,84 @@
+name: Score and publish site
+
+# Hourly: rebuild a warehouse from the `data` branch plus the live feeds, score every
+# overflow with both models (from the models-v1 release), and deploy the website to
+# GitHub Pages. New complete days of rainfall are committed back to the `data` branch.
+on:
+  schedule:
+    - cron: "12 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+env:
+  MODELS_RELEASE: models-v1
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: cloud-data
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements-cloud.txt
+
+      - name: Install (pinned versions, to load the saved models)
+        run: |
+          pip install --quiet -r requirements-cloud.txt
+          pip install --quiet --no-deps -e .
+
+      - name: Download models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$MODELS_RELEASE" --pattern models.tar.gz
+          mkdir -p data && tar -xzf models.tar.gz -C data
+
+      - name: Score and build site data
+        run: spillwatch cloud-publish --data-dir cloud-data --out site/data
+
+      - name: Save new rainfall days to the data branch
+        working-directory: cloud-data
+        run: |
+          git config user.name "spillwatch-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A rain_hourly
+          if git diff --cached --quiet; then exit 0; fi
+          git commit --quiet -m "data: rainfall $(date -u +%Y-%m-%d)"
+          for attempt in 1 2 3; do
+            git push --quiet origin HEAD:data && exit 0
+            git pull --quiet --rebase origin data
+          done
+          exit 1
+
+      - run: touch site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -138,3 +138,84 @@ def load_into_warehouse(con, data_dir: Path) -> int:
             FROM read_csv(?, union_by_name = true, all_varchar = true)
         """, [runs])
     return loaded
+
+
+# --------------------------------------------------------------------------- rainfall
+
+# 30-day antecedent rainfall for spills up to 7 days old, plus a margin
+RAIN_DAYS = 38
+
+
+def hourly_from_readings(df: pd.DataFrame) -> pd.DataFrame:
+    """15-min readings -> hourly totals. A reading timestamped T covers the period ending at T."""
+    if df.empty:
+        return pd.DataFrame(columns=["measure_id", "station_id", "hour_start", "mm", "readings"])
+    hour = (pd.to_datetime(df["reading_at"], utc=True) - pd.Timedelta(seconds=1)).dt.floor("h")
+    return (df.assign(hour_start=hour)
+              .groupby(["measure_id", "hour_start"], as_index=False)
+              .agg(station_id=("station_id", "first"), mm=("rain_mm", "sum"), readings=("rain_mm", "size")))
+
+
+def rain_file(data_dir: Path, day) -> Path:
+    return data_dir / "rain_hourly" / f"date={day:%Y-%m-%d}" / "hourly.parquet"
+
+
+def sync_rain(con, session, data_dir: Path, today, days: int = RAIN_DAYS) -> int:
+    """Make the last `days` complete calendar days available in the data branch (fetching
+    any that are missing), load them into raw_rain_hourly, and load today's partial
+    readings into raw_rainfall_readings without storing them."""
+    from datetime import timedelta
+
+    from spillwatch import warehouse
+    from spillwatch.ingest import rainfall
+
+    fetched = 0
+    for i in range(1, days + 1):
+        day = today - timedelta(days=i)
+        path = rain_file(data_dir, day)
+        if path.exists():
+            continue
+        readings = rainfall.fetch_day(session, day)
+        if readings.empty:
+            # Older than the readings API keeps (~4 weeks): use the daily archive file
+            try:
+                readings = rainfall.fetch_archive_day(session, day)
+            except Exception as exc:
+                log.warning("No rainfall available for %s: %s", day, exc)
+                continue
+        hourly = hourly_from_readings(readings)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        hourly.to_parquet(path, index=False)
+        fetched += 1
+    files = [str(rain_file(data_dir, today - timedelta(days=i))) for i in range(1, days + 1)]
+    files = [f for f in files if Path(f).exists()]
+    if files:
+        con.execute("""
+            INSERT OR IGNORE INTO raw_rain_hourly (measure_id, station_id, hour_start, mm, readings)
+            SELECT measure_id, station_id, hour_start, mm, readings FROM read_parquet(?)
+        """, [files])
+    warehouse.insert_ignore(con, "raw_rainfall_readings", rainfall.fetch_day(session, today))
+    log.info("Rainfall: %d stored days available, %d fetched this run", len(files), fetched)
+    return fetched
+
+
+def export_rain(con, data_dir: Path, today, days: int = RAIN_DAYS) -> int:
+    """Seed the data branch from a local warehouse (complete calendar days only)."""
+    from datetime import timedelta
+
+    written = 0
+    for i in range(1, days + 1):
+        day = today - timedelta(days=i)
+        path = rain_file(data_dir, day)
+        if path.exists():
+            continue
+        df = con.execute("""
+            SELECT measure_id, station_id, hour_start, mm, readings FROM rain_hourly
+            WHERE hour_start >= ? AND hour_start < ? + INTERVAL 1 DAY
+        """, [day, day]).df()
+        if df.empty or df["hour_start"].nunique() < 24:
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(path, index=False)
+        written += 1
+    return written

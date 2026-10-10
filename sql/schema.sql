@@ -72,3 +72,14 @@ CREATE TABLE IF NOT EXISTS raw_cloud_runs (
     keyframe     BOOLEAN,
     companies    VARCHAR
 );
+
+-- Hourly rainfall per gauge measure. Filled from the cloud data branch; locally it
+-- is merged with hourly sums of raw_rainfall_readings (see models.sql: rain_hourly).
+CREATE TABLE IF NOT EXISTS raw_rain_hourly (
+    measure_id VARCHAR NOT NULL,
+    station_id VARCHAR,
+    hour_start TIMESTAMPTZ NOT NULL,   -- readings in [hour_start, hour_start + 1 h)
+    mm         DOUBLE,
+    readings   INTEGER,                -- 15-min readings present (4 = complete hour)
+    PRIMARY KEY (measure_id, hour_start)
+);

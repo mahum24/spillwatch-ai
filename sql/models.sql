@@ -126,3 +126,20 @@ WITH s AS (
     FROM raw_overflow_snapshots
 )
 SELECT * FROM s WHERE previous_status IS DISTINCT FROM status AND previous_status IS NOT NULL;
+
+-- Hourly rainfall per measure from every source; for each hour keep the most
+-- complete version. A 15-min reading timestamped T covers the period ending at T.
+CREATE OR REPLACE TABLE rain_hourly AS
+WITH from_readings AS (
+    SELECT measure_id, ANY_VALUE(station_id) AS station_id,
+           DATE_TRUNC('hour', reading_at - INTERVAL 1 SECOND) AS hour_start,
+           SUM(rain_mm) AS mm, COUNT(*) AS readings
+    FROM raw_rainfall_readings GROUP BY measure_id, hour_start
+),
+combined AS (
+    SELECT * FROM from_readings
+    UNION ALL
+    SELECT measure_id, station_id, hour_start, mm, readings FROM raw_rain_hourly
+)
+SELECT * FROM combined
+QUALIFY ROW_NUMBER() OVER (PARTITION BY measure_id, hour_start ORDER BY readings DESC) = 1;

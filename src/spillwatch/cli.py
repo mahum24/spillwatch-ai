@@ -16,6 +16,9 @@
     python -m spillwatch.cli cloud-collect        # (GitHub Actions) write overflow changes to --data-dir
     python -m spillwatch.cli sync-cloud           # pull cloud-collected data into the local warehouse
     python -m spillwatch.cli publish [--out DIR]  # score live data, write website JSON
+    python -m spillwatch.cli export-models        # bundle models for the cloud (GitHub Release)
+    python -m spillwatch.cli export-rain          # seed hourly rainfall into --data-dir
+    python -m spillwatch.cli cloud-publish        # (GitHub Actions) rebuild, score, write site JSON
 """
 
 import argparse
@@ -253,6 +256,67 @@ def cmd_publish(_con, _session, args):
     print(json.dumps({k: v for k, v in summary.items() if k != "by_company"}, indent=2))
 
 
+def cmd_export_models(_con, _session, args):
+    """Bundle trained models + site features into one archive for the cloud scorer."""
+    import tarfile
+
+    import duckdb
+
+    from spillwatch import live
+    from spillwatch.config import DATA_DIR, RESEARCH_DB_PATH
+    from spillwatch.ml import dry_spill
+
+    con = duckdb.connect()
+    con.execute(f"ATTACH '{RESEARCH_DB_PATH}' AS r (READ_ONLY)")
+    con.execute(live.SITE_FEATURES_SQL.format(wet=dry_spill.WET_3D_MM, k=live.SITE_PRIOR_K)).df() \
+        .to_parquet(live.SITE_FEATURES_PATH, index=False)
+    con.close()
+    if live.THRESHOLD_PATH.exists():
+        live.THRESHOLD_PATH.unlink()  # recompute from the evaluation outputs
+    live.THRESHOLD_PATH.write_text(json.dumps({"p_spill_threshold": live.suspicion_threshold()}))
+
+    members = ["models/site_features.parquet", "models/dry_spill/model.joblib", "models/dry_spill/metrics.json",
+               "models/dry_spill/threshold.json", "models/forecast/model_h1.joblib",
+               "models/forecast/model_h2.joblib", "models/forecast/metrics.json"]
+    out = DATA_DIR / "models.tar.gz"
+    with tarfile.open(out, "w:gz") as tar:
+        for m in members:
+            tar.add(DATA_DIR / m, arcname=m)
+    log.info("Wrote %s (%.1f MB)", out, out.stat().st_size / 1e6)
+
+
+def cmd_export_rain(con, _session, args):
+    """Seed the cloud data branch with hourly rainfall from this machine."""
+    from pathlib import Path
+
+    from spillwatch import cloud
+
+    n = cloud.export_rain(con, Path(args.data_dir), date.today())
+    log.info("Exported %d days of hourly rainfall to %s", n, args.data_dir)
+
+
+def cmd_cloud_publish(_con, session, args):
+    """Used by GitHub Actions: build a fresh warehouse from the data branch plus live
+    feeds, then score with both models and write the website JSON."""
+    from pathlib import Path
+
+    from spillwatch import cloud, live
+
+    data_dir = Path(args.data_dir)
+    con = warehouse.connect()
+    try:
+        warehouse.replace_table(con, "raw_rain_stations", rainfall.fetch_stations(session))
+        snap = overflows.collect_snapshot(session, typical_counts=cloud.typical_counts_from_runs(data_dir))
+        warehouse.insert_ignore(con, "raw_overflow_snapshots", snap)
+        cloud.load_into_warehouse(con, data_dir)
+        cloud.sync_rain(con, session, data_dir, date.today())
+        warehouse.run_models(con)
+    finally:
+        con.close()
+    summary = live.publish(Path(args.out))
+    log.info("Published: %s", {k: v for k, v in summary.items() if k not in ("by_company", "feeds", "models")})
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -303,10 +367,13 @@ COMMANDS = {
     "cloud-collect": cmd_cloud_collect,
     "sync-cloud": cmd_sync_cloud,
     "publish": cmd_publish,
+    "export-models": cmd_export_models,
+    "export-rain": cmd_export_rain,
+    "cloud-publish": cmd_cloud_publish,
 }
 
 # Research commands use their own files/database and never lock the live warehouse
-RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast", "cloud-collect", "publish"}
+RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast", "cloud-collect", "publish", "export-models", "cloud-publish"}
 
 
 def main(argv=None):

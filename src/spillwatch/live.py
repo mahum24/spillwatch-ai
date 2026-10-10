@@ -33,6 +33,9 @@ FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 RECENT_DAYS = 7
 SITE_PRIOR_K = 20
 RISK_LEVELS = [(0.5, "high"), (0.2, "elevated"), (0.0, "low")]
+# Exported with the models (`spillwatch export-models`) so the cloud needs no research DB
+SITE_FEATURES_PATH = DATA_DIR / "models" / "site_features.parquet"
+THRESHOLD_PATH = DATA_DIR / "models" / "dry_spill" / "threshold.json"
 
 
 # --------------------------------------------------------------------------- inputs
@@ -100,10 +103,10 @@ FROM w.dim_overflows o LEFT JOIN linked l USING (overflow_id);
 CREATE OR REPLACE TEMP TABLE gauge_days AS
 WITH m AS (
     SELECT measure_id, ANY_VALUE(station_id) AS station_id,
-           CAST(reading_at - INTERVAL 9 HOUR - INTERVAL 1 SECOND AS DATE) AS rain_day,
-           SUM(rain_mm) AS mm, COUNT(*) AS n
-    FROM w.raw_rainfall_readings
-    WHERE reading_at >= DATE '{start}'
+           CAST(hour_start - INTERVAL 9 HOUR AS DATE) AS rain_day,
+           SUM(mm) AS mm, SUM(readings) AS n
+    FROM w.rain_hourly
+    WHERE hour_start >= DATE '{start}'
     GROUP BY measure_id, rain_day
 )
 SELECT station_id, rain_day, AVG(mm) AS rain_mm FROM m WHERE n >= 88 GROUP BY ALL;
@@ -135,11 +138,14 @@ GROUP BY ALL;
 def load_inputs(now: datetime):
     con = duckdb.connect()
     for alias, path in (("w", WAREHOUSE_PATH), ("r", RESEARCH_DB_PATH)):
+        if alias == "r" and SITE_FEATURES_PATH.exists():
+            continue  # cloud: site features come from the model bundle
         ro = open_readonly(path)  # wait out the collector's lock, then attach
         ro.close()
         con.execute(f"ATTACH '{path}' AS {alias} (READ_ONLY)")
     con.execute("SET TimeZone = 'UTC'")
-    site_feats = con.execute(SITE_FEATURES_SQL.format(wet=dry_spill.WET_3D_MM, k=SITE_PRIOR_K)).df()
+    site_feats = (pd.read_parquet(SITE_FEATURES_PATH) if SITE_FEATURES_PATH.exists()
+                  else con.execute(SITE_FEATURES_SQL.format(wet=dry_spill.WET_3D_MM, k=SITE_PRIOR_K)).df())
     con.register("site_feats", site_feats)
     start = issue_day(now) - timedelta(days=45)
     con.execute(LIVE_SQL.format(start=start.isoformat()))
@@ -195,6 +201,8 @@ def _season(days: pd.Series) -> tuple[pd.Series, pd.Series]:
 def suspicion_threshold() -> float:
     """Model threshold that flags the same share of real spills as the dry-day rule did
     in the held-out evaluation, so the two are compared at an equal flagging rate."""
+    if THRESHOLD_PATH.exists():
+        return json.loads(THRESHOLD_PATH.read_text())["p_spill_threshold"]
     scored = pd.read_parquet(dry_spill.MODEL_DIR / "test_spills_scored.parquet")
     metrics = json.loads((dry_spill.MODEL_DIR / "metrics.json").read_text())
     share = metrics["disagreement"]["real_spills_flagged_by_rule"] / metrics["detection"]["real_spills"]

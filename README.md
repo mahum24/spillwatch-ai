@@ -85,7 +85,7 @@ Kept in a separate `data/research.duckdb` so it never blocks the live collector.
 
 `spillwatch publish` scores live data with both models and writes JSON to `site/data/`; `scripts/deploy_site.sh` publishes `site/` to the `gh-pages` branch (GitHub Pages). It is a static site (Leaflet + vanilla JS), so there is no server to run. Shareable links: `#view=suspicious&site=<overflow id>`.
 
-Currently the scoring runs hourly from the laptop collector; moving it to GitHub Actions is the next step.
+In production the [`Score and publish site`](.github/workflows/publish.yml) workflow does this hourly in GitHub Actions: it rebuilds a warehouse from the `data` branch plus the live feeds, downloads the trained models from the [`models-v1` release](https://github.com/mahum24/spillwatch-ai/releases/tag/models-v1), scores, and deploys to GitHub Pages. `scripts/deploy_site.sh` remains for manual deploys from a laptop.
 
 ## Data quality
 
