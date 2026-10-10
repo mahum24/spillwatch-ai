@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpillWatch AI</title>
+  <meta name="description" content="Live sewage overflow monitoring for England, with AI that flags suspicious spills and forecasts tomorrow's spill risk.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23176b7a'/%3E%3Cpath d='M9 19c3-4 5 2 7-2s5-4 7 0' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14"/><path d="M9 19c3-4 5 2 7-2s5-4 7 0"/></svg>
+      <div>
+        <h1>SpillWatch AI</h1>
+        <p class="tagline">Live sewage overflow monitoring for England's rivers and seas</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="updated" class="updated">Loading…</span>
+      <button id="aboutBtn" class="link-btn" type="button">How it works</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel" aria-label="Controls and results">
+      <section class="kpis" aria-label="Key figures">
+        <div class="kpi"><span class="kpi-value" id="kpiNow">–</span><span class="kpi-label">spilling now</span></div>
+        <div class="kpi"><span class="kpi-value" id="kpi7d">–</span><span class="kpi-label">spills in the last 7 days</span></div>
+        <div class="kpi accent-sus"><span class="kpi-value" id="kpiSus">–</span><span class="kpi-label">flagged as unexpected by AI (7 days)</span></div>
+        <div class="kpi accent-risk"><span class="kpi-value" id="kpiRisk">–</span><span class="kpi-label">high spill risk tomorrow</span></div>
+      </section>
+
+      <div class="views" role="tablist" aria-label="Map view">
+        <button role="tab" class="view-btn" data-view="now" aria-selected="true">Now</button>
+        <button role="tab" class="view-btn" data-view="suspicious" aria-selected="false">Suspicious</button>
+        <button role="tab" class="view-btn" data-view="today" aria-selected="false">Risk today</button>
+        <button role="tab" class="view-btn" data-view="tomorrow" aria-selected="false">Risk tomorrow</button>
+      </div>
+      <p id="viewHelp" class="view-help"></p>
+
+      <div class="filters">
+        <label for="company">Water company</label>
+        <select id="company"><option value="">All companies</option></select>
+        <button id="nearBtn" class="secondary" type="button">Near me</button>
+      </div>
+
+      <div id="legend" class="legend" aria-label="Map legend"></div>
+
+      <section id="details" class="details" hidden aria-live="polite"></section>
+
+      <section class="list-wrap">
+        <h2 id="listTitle">Spilling now</h2>
+        <ol id="list" class="list"></ol>
+      </section>
+
+      <footer class="panel-footer">
+        Open data from water companies (National Storm Overflow Hub), the Environment Agency and Open-Meteo.
+        A flagged spill is <strong>potentially</strong> suspicious, not proven illegal.
+        <a href="https://github.com/mahum24/spillwatch-ai">Code and method on GitHub</a>.
+      </footer>
+    </aside>
+
+    <div id="map" class="map" role="region" aria-label="Map of storm overflows"></div>
+  </main>
+
+  <dialog id="about" class="about">
+    <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+    <h2>How SpillWatch AI works</h2>
+    <p>Storm overflows are allowed to release untreated sewage only during heavy rain. Since 2024 every water company in England publishes when each of its ~14,000 overflows is spilling. SpillWatch AI collects that data every 15 minutes and adds two AI models.</p>
+    <h3>1. Unexpected spills</h3>
+    <p>A model trained on ~1.8 million past spills learns how likely each overflow is to spill given the rainfall nearby (on the day, the previous day and over the past 30 days) and how much rain that overflow normally needs. A spill the model considered very unlikely for the weather is flagged as <em>unexpected</em>.</p>
+    <p>On held-out data it separates spill days from dry days with an AUC of <span data-metric="suspicion_auc"></span>. Compared with the simple "dry-day" rule (less than 0.25 mm of rain on the day and the day before), it also catches spills after light rain that the rule cannot: <span data-metric="suspicion_light_rain_recall" data-pct></span> of simulated weather-independent spills in light rain, against 0% for the rule.</p>
+    <h3>2. Spill risk today and tomorrow</h3>
+    <p>A second model combines recent rainfall, whether the overflow is already spilling and the latest weather forecast. Tested with the forecasts that were actually available at the time, it reaches an AUC of <span data-metric="forecast_auc_today"></span> for today and <span data-metric="forecast_auc_tomorrow"></span> for tomorrow.</p>
+    <h3>Limitations</h3>
+    <ul>
+      <li>An unexpected spill is <strong>not proof of illegal activity</strong>. Monitors can fail, and local rain can be missed by gauges up to 10 km away.</li>
+      <li>Anglian, South West, Southern and Thames Water do not publish event history, so their overflows are scored without site history (lower confidence).</li>
+      <li>Forecasts are probabilities; about half of high-risk warnings do not end in a spill.</li>
+      <li>About 7% of overflows have no rain gauge within 10 km and are not scored.</li>
+    </ul>
+    <p>Built as an MSc AI research project. <a href="https://github.com/mahum24/spillwatch-ai">Full method, code and evaluation</a>.</p>
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

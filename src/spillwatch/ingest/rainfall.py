@@ -1,5 +1,6 @@
 """Environment Agency rainfall: gauge locations, latest readings and daily archive backfill."""
 
+import io
 import logging
 import tempfile
 from datetime import date
@@ -52,6 +53,35 @@ def fetch_latest(session: requests.Session) -> pd.DataFrame:
         for item in resp.json()["items"]
     ]
     return _finalise(pd.DataFrame(records))
+
+
+def fetch_day(session: requests.Session, day: date, page_size: int = 10_000) -> pd.DataFrame:
+    """All rainfall readings for one recent day via the API (~88k rows in ~9 pages).
+
+    Much lighter than the daily archive file (~2 MB vs ~150 MB) and also works for
+    today (partial). `_sorted` gives a stable order so offset paging is consistent.
+    """
+    frames, offset = [], 0
+    while True:
+        resp = session.get(
+            f"{EA_BASE}/data/readings.csv",
+            params={"parameter": "rainfall", "date": day.isoformat(), "_sorted": "",
+                    "_limit": page_size, "_offset": offset},
+            timeout=HTTP_TIMEOUT,
+        )
+        resp.raise_for_status()
+        page = pd.read_csv(io.StringIO(resp.text), dtype={"value": "string"}) if resp.text.strip() else None
+        # The API occasionally returns a short page before the end, so only stop on an
+        # empty page; advancing by page_size keeps offsets aligned either way.
+        if page is None or page.empty or offset > 500_000:
+            break
+        frames.append(page)
+        offset += page_size
+    raw = pd.concat(frames, ignore_index=True)
+    df = pd.DataFrame({"measure_id": raw["measure"].str.rsplit("/", n=1).str[-1],
+                       "reading_at": raw["dateTime"], "rain_mm": raw["value"]})
+    log.info("API %s: %d rainfall readings", day, len(df))
+    return _finalise(df)
 
 
 def fetch_archive_day(session: requests.Session, day: date) -> pd.DataFrame:

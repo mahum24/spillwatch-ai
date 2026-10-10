@@ -15,6 +15,7 @@
     python -m spillwatch.cli train-forecast       # train + evaluate 1-2 day spill forecasting
     python -m spillwatch.cli cloud-collect        # (GitHub Actions) write overflow changes to --data-dir
     python -m spillwatch.cli sync-cloud           # pull cloud-collected data into the local warehouse
+    python -m spillwatch.cli publish [--out DIR]  # score live data, write website JSON
 """
 
 import argparse
@@ -78,22 +79,31 @@ def cmd_collect(con, session, _args):
 
 
 def cmd_backfill_rain(con, session, args):
-    end = date.today() - timedelta(days=1)  # today's archive isn't published yet
-    for i in range(args.days):
-        day = end - timedelta(days=i)
-        already = con.execute(
-            "SELECT COUNT(*) FROM raw_rainfall_readings WHERE CAST(reading_at AS DATE) = ?", [day]
-        ).fetchone()[0]
-        if already > 50_000 and not args.force:
-            log.info("Skipping %s (already loaded)", day)
-            continue
+    """Fill rainfall gaps. Recent days (and today, partially) come from the API;
+    older days from the daily archive files."""
+    today = date.today()
+    days = [today] + [today - timedelta(days=i) for i in range(1, args.days + 1)]
+    for day in days:
+        recent = (today - day).days <= API_DAYS
+        if not recent and not args.force:
+            already = con.execute(
+                "SELECT COUNT(*) FROM raw_rainfall_readings WHERE CAST(reading_at AS DATE) = ?", [day]
+            ).fetchone()[0]
+            if already > 50_000:
+                log.info("Skipping %s (already loaded)", day)
+                continue
 
-        def job(day=day):
-            df = rainfall.fetch_archive_day(session, day)
-            warehouse.land_raw(df, "rainfall_archive", datetime.combine(day, datetime.min.time()))
+        def job(day=day, recent=recent):
+            df = rainfall.fetch_day(session, day) if recent else rainfall.fetch_archive_day(session, day)
+            warehouse.land_raw(df, "rainfall_day" if recent else "rainfall_archive",
+                               datetime.combine(day, datetime.min.time()))
             return warehouse.insert_ignore(con, "raw_rainfall_readings", df)
 
-        _run_job(con, f"rainfall_archive:{day}", job)
+        _run_job(con, f"rainfall_{'api' if recent else 'archive'}:{day}", job)
+
+
+# The readings API serves recent days cheaply; older days use the archive files
+API_DAYS = 20
 
 
 def cmd_transform(con, _session, _args):
@@ -233,6 +243,16 @@ def cmd_sync_cloud(con, _session, _args):
     log.info("Loaded %d cloud rows from %d runs (%s to %s)", rows, *runs)
 
 
+def cmd_publish(_con, _session, args):
+    """Score live data with both models and write JSON for the website."""
+    from pathlib import Path
+
+    from spillwatch import live
+
+    summary = live.publish(Path(args.out))
+    print(json.dumps({k: v for k, v in summary.items() if k != "by_company"}, indent=2))
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -282,10 +302,11 @@ COMMANDS = {
     "train-forecast": cmd_train_forecast,
     "cloud-collect": cmd_cloud_collect,
     "sync-cloud": cmd_sync_cloud,
+    "publish": cmd_publish,
 }
 
 # Research commands use their own files/database and never lock the live warehouse
-RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast", "cloud-collect"}
+RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast", "cloud-collect", "publish"}
 
 
 def main(argv=None):
@@ -294,6 +315,7 @@ def main(argv=None):
     parser.add_argument("--days", type=int, default=7, help="days of rainfall to backfill")
     parser.add_argument("--force", action="store_true", help="re-download days already loaded")
     parser.add_argument("--source", choices=HISTORY_SOURCES, help="history: one source only")
+    parser.add_argument("--out", default="site/data", help="publish: output directory for JSON")
     parser.add_argument("--data-dir", default="cloud-data", help="cloud-collect: output directory")
     parser.add_argument("--strict", action="store_true", help="exit non-zero if any check fails")
     parser.add_argument("-v", "--verbose", action="store_true")
