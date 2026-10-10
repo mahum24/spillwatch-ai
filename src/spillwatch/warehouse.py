@@ -1,5 +1,7 @@
 """DuckDB warehouse: schema setup, idempotent loads and the raw parquet landing zone."""
 
+import logging
+import time
 from datetime import datetime
 
 import duckdb
@@ -7,10 +9,23 @@ import pandas as pd
 
 from spillwatch.config import RAW_DIR, SQL_DIR, WAREHOUSE_PATH
 
+log = logging.getLogger(__name__)
 
-def connect(path=WAREHOUSE_PATH) -> duckdb.DuckDBPyConnection:
+
+def connect(path=WAREHOUSE_PATH, wait_s: int = 120) -> duckdb.DuckDBPyConnection:
+    """Open the warehouse, waiting if another process (e.g. the cron collector,
+    which runs for ~15 s every 15 minutes) holds DuckDB's single-writer lock."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(path))
+    deadline = time.monotonic() + wait_s
+    while True:
+        try:
+            con = duckdb.connect(str(path))
+            break
+        except duckdb.IOException as exc:
+            if "lock" not in str(exc).lower() or time.monotonic() > deadline:
+                raise
+            log.info("Warehouse is locked by another process; retrying in 5 s")
+            time.sleep(5)
     con.execute("SET TimeZone = 'UTC'")
     con.execute((SQL_DIR / "schema.sql").read_text())
     return con
