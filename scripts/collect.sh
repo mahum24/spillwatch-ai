@@ -13,8 +13,4 @@ SW=.venv/bin/spillwatch
 
   $SW collect && $SW transform && $SW check
 
-  # Once an hour, rescore with both models and redeploy the website
-  if [ "$(date +%M)" -lt 15 ]; then
-    ./scripts/deploy_site.sh
-  fi
 } >> "data/logs/collect_$(date +%Y-%m-%d).log" 2>&1

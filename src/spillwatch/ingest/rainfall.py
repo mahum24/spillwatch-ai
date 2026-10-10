@@ -77,6 +77,9 @@ def fetch_day(session: requests.Session, day: date, page_size: int = 10_000) -> 
             break
         frames.append(page)
         offset += page_size
+    if not frames:  # the API only keeps ~4 weeks of readings
+        log.info("API %s: no readings available", day)
+        return pd.DataFrame(columns=READING_COLUMNS)
     raw = pd.concat(frames, ignore_index=True)
     df = pd.DataFrame({"measure_id": raw["measure"].str.rsplit("/", n=1).str[-1],
                        "reading_at": raw["dateTime"], "rain_mm": raw["value"]})

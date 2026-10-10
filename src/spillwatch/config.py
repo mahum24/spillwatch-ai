@@ -2,8 +2,11 @@
 
 from pathlib import Path
 
+import os
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = PROJECT_ROOT / "data"
+# Overridable so CI (and tests) can run against a fresh, isolated data directory
+DATA_DIR = Path(os.environ.get("SPILLWATCH_DATA_DIR", PROJECT_ROOT / "data"))
 RAW_DIR = DATA_DIR / "raw"
 WAREHOUSE_PATH = DATA_DIR / "spillwatch.duckdb"
 SQL_DIR = PROJECT_ROOT / "sql"

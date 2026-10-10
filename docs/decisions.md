@@ -133,3 +133,13 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 **Fix:** Recent days now come from the readings API (`date=` + `_sorted` paging, ~2 MB/day instead of the ~150 MB archive), re-fetched hourly, so gaps repair themselves after sleep. The API sometimes returns a short page before the end, so paging only stops on an empty page (a day went from 59,997 to the full 88,105 readings).
 **Training/serving skew check:** for the same gauges, daily totals from 15-min readings vs the Hydrology API daily totals used in training: mean 1.51 vs 1.46 mm, dry-day agreement 97%, correlation 0.79. Shifting either source by a day drops correlation to ~0.1, confirming the 09:00 rain-day alignment used in training is correct.
 **To monitor:** in the first live week the model flagged 2.4% of scored spills (rule 0.8%) vs ~1.3% each in evaluation. One week is a small sample; track over time.
+
+### 2026-10-10 — Scoring and deployment in GitHub Actions
+**Decision:** An hourly workflow rebuilds a fresh warehouse from the `data` branch plus a live snapshot, scores with models downloaded from a GitHub Release, and deploys to Pages. The laptop no longer deploys.
+**Design points:**
+- Models are published as a versioned release asset (3 MB) and loaded with exact pinned library versions (`requirements-cloud.txt`), because joblib pickles are only safe to load with the scikit-learn/numpy they were saved with.
+- Site features and the suspicion threshold are exported with the models, so the cloud needs no research database.
+- Rainfall is stored on the `data` branch as hourly totals per gauge, one file per complete day (~80 KB), seeded with 31 days from the laptop. Today's partial readings are fetched every run but never stored.
+- The readings API keeps only ~4 weeks (15 Sept available, 10 Sept empty on 10 Oct), so older missing days fall back to the daily archive file; each is fetched once and then stored.
+- `SPILLWATCH_DATA_DIR` lets the job (and a local rehearsal) run in an isolated directory. The rehearsal ran the whole job from an empty directory in 2.5 min (first run, including 7 archive days).
+**Known difference:** cloud event history starts on 10 Oct, so its 7-day counts were initially lower than the laptop's (2,917 vs 3,392 spills); this closes as history accumulates.
