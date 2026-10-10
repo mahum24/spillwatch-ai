@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+.DS_Store
+.env
+*.egg-info/
+
+# Personal ICA material: never published (individual assessment)
+private/
