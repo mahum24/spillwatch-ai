@@ -99,3 +99,16 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 ### 2026-10-09 — Collect at :07/:22/:37/:52, not on the quarter hour
 **Evidence:** South West Water's feed failed at 22:30 (1,000 of 1,342 sites) and 23:00 (count 1,342 but 0 rows returned), both exactly on the half hour, and was fine minutes later. This suggests they reload on a :00/:30 schedule.
 **Decision:** Offset collection by 7 minutes to avoid reload windows. Watch `companies_in_latest_snapshot` to confirm the failures stop.
+
+### 2026-10-10 — Honest forecast evaluation with archived forecasts
+**Decision:** Train on observed rain (perfect prognosis), test with archived real forecasts from the Open-Meteo Previous Runs API (archive from Jan 2024), and report an oracle upper bound and a no-forecast baseline.
+**Why:** Testing with the rain that actually fell would overstate real-world skill (AUC 0.951 oracle vs 0.916 with real forecasts at 1 day).
+**Constraint:** Free tier 5,000 weighted calls/hour; ~14 months per location ≈ 31 calls. A 0.25° grid gives 158 cells (~4,900 calls), paced at one request per 4 s.
+**Result:** Real forecasts capture about two-thirds of the possible gain from rainfall information at both horizons. See `docs/results/phase4_forecast.md`.
+
+### 2026-10-10 — Target for forecasting is "spill active", not "spill started"
+**Why:** Swimmers care whether sewage is flowing, including spills continuing from the day before. Whether the site was spilling on the last observed day is known at issue time, so it is a legitimate feature (persistence baseline AUC 0.79).
+
+### 2026-10-10 — Laptop sleep stops collection
+**Evidence:** The Mac slept on battery from ~23:30 to 10:03; no collection ran and training was paused for ~10.5 h (5.6 min of CPU in 10.6 h wall-clock).
+**Decision:** Move live collection to a cloud scheduler before the frontend goes public.

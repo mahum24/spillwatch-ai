@@ -11,7 +11,7 @@ England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million 
 | 1. Data pipeline | Live overflow + rainfall ingestion, DuckDB warehouse, spill events, rain-gauge matching, baseline dry-spill rule | ✅ Done |
 | 2. Orchestration & quality | Scheduled collection, 11 data-quality checks, collector gaps, monitor status changes | ✅ Done |
 | 3. AI: suspicious-spill detection | Model of expected spilling given rainfall (AUC 0.927), evaluated against the dry-day rule. [Results](docs/results/phase3_dry_spill.md) | ✅ First version |
-| 4. AI: spill forecasting | 24–48h spill probability from rainfall forecasts | ⏳ Next |
+| 4. AI: spill forecasting | 1–2 day spill risk; AUC 0.916 / 0.894 with real archived forecasts. [Results](docs/results/phase4_forecast.md) | ✅ First version |
 | 5. AI: river assistant | LLM answering questions over the warehouse | |
 | 6. Frontend | Live map, suspicious spills, swim-safety forecast, impact dashboard | |
 
@@ -71,7 +71,9 @@ Kept in a separate `data/research.duckdb` so it never blocks the live collector.
 .venv/bin/spillwatch history          # ~1.8M historical spill events from 8 company datasets
 .venv/bin/spillwatch rain-history     # daily rainfall, 991 EA gauges, 2020 onwards
 .venv/bin/spillwatch build-research   # merge events into spells, build the site-day table
-.venv/bin/spillwatch train            # train + evaluate; writes data/models/dry_spill/
+.venv/bin/spillwatch train            # suspicious-spill model; writes data/models/dry_spill/
+.venv/bin/spillwatch forecast-history # archived rain forecasts for the test period (Open-Meteo)
+.venv/bin/spillwatch train-forecast   # 1-2 day spill forecasting; writes data/models/forecast/
 ```
 
 ## Data quality
