@@ -13,6 +13,8 @@
     python -m spillwatch.cli train                # train + evaluate the suspicious-spill model
     python -m spillwatch.cli forecast-history     # download archived rain forecasts (test period)
     python -m spillwatch.cli train-forecast       # train + evaluate 1-2 day spill forecasting
+    python -m spillwatch.cli cloud-collect        # (GitHub Actions) write overflow changes to --data-dir
+    python -m spillwatch.cli sync-cloud           # pull cloud-collected data into the local warehouse
 """
 
 import argparse
@@ -200,6 +202,37 @@ def cmd_train_forecast(_con, _session, _args):
                       f"hit rate {hit:.1%}  false alarms {far:.1%}")
 
 
+def cmd_cloud_collect(_con, _session, args):
+    """Used by GitHub Actions: write changed overflows into a git-tracked directory."""
+    from pathlib import Path
+
+    from spillwatch import cloud
+
+    data_dir = Path(args.data_dir)
+    run = cloud.collect(data_dir, typical_counts=cloud.typical_counts_from_runs(data_dir))
+    log.info("cloud run: %s", run)
+
+
+def cmd_sync_cloud(con, _session, _args):
+    """Pull the cloud-collected data branch and load it into the local warehouse."""
+    import subprocess
+
+    from spillwatch import cloud
+    from spillwatch.config import DATA_DIR, PROJECT_ROOT
+
+    target = DATA_DIR / "cloud"
+    if (target / ".git").exists():
+        subprocess.run(["git", "-C", str(target), "pull", "--quiet", "--ff-only"], check=True)
+    else:
+        remote = subprocess.run(["git", "-C", str(PROJECT_ROOT), "remote", "get-url", "origin"],
+                                check=True, capture_output=True, text=True).stdout.strip()
+        subprocess.run(["git", "clone", "--quiet", "--branch", "data", "--single-branch", remote, str(target)],
+                       check=True)
+    rows = cloud.load_into_warehouse(con, target)
+    runs = con.execute("SELECT COUNT(*), MIN(snapshot_at), MAX(snapshot_at) FROM raw_cloud_runs").fetchone()
+    log.info("Loaded %d cloud rows from %d runs (%s to %s)", rows, *runs)
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -247,10 +280,12 @@ COMMANDS = {
     "train": cmd_train,
     "forecast-history": cmd_forecast_history,
     "train-forecast": cmd_train_forecast,
+    "cloud-collect": cmd_cloud_collect,
+    "sync-cloud": cmd_sync_cloud,
 }
 
 # Research commands use their own files/database and never lock the live warehouse
-RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast"}
+RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast", "cloud-collect"}
 
 
 def main(argv=None):
@@ -259,6 +294,7 @@ def main(argv=None):
     parser.add_argument("--days", type=int, default=7, help="days of rainfall to backfill")
     parser.add_argument("--force", action="store_true", help="re-download days already loaded")
     parser.add_argument("--source", choices=HISTORY_SOURCES, help="history: one source only")
+    parser.add_argument("--data-dir", default="cloud-data", help="cloud-collect: output directory")
     parser.add_argument("--strict", action="store_true", help="exit non-zero if any check fails")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)

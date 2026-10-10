@@ -23,14 +23,21 @@ WHERE r.rn = 1;
 
 -- Spill events reconstructed from snapshots. Each distinct latest_event_start is one
 -- event; its end is the latest end time ever reported for it (NULL = still spilling).
+-- Local snapshots and cloud keyframes/changes are combined, so an event seen by
+-- either collector is captured (the cloud keeps running while the laptop sleeps).
 CREATE OR REPLACE TABLE fct_spill_events AS
+WITH observations AS (
+    SELECT overflow_id, company, latest_event_start, latest_event_end, snapshot_at FROM raw_overflow_snapshots
+    UNION ALL
+    SELECT overflow_id, company, latest_event_start, latest_event_end, snapshot_at FROM raw_overflow_cloud
+)
 SELECT overflow_id,
        ANY_VALUE(company)                          AS company,
        latest_event_start                          AS event_start,
        MAX(latest_event_end) FILTER (WHERE latest_event_end >= latest_event_start) AS event_end,
        MIN(snapshot_at)                            AS first_seen_at,
        MAX(snapshot_at)                            AS last_seen_at
-FROM raw_overflow_snapshots
+FROM observations
 WHERE latest_event_start IS NOT NULL
 GROUP BY overflow_id, latest_event_start;
 
@@ -100,7 +107,11 @@ END;
 -- Collector health: gap since the previous snapshot. Gaps > 20 min mean events
 -- may have been missed, so they bound the completeness of fct_spill_events.
 CREATE OR REPLACE TABLE fct_collection_gaps AS
-WITH snaps AS (SELECT DISTINCT snapshot_at FROM raw_overflow_snapshots)
+WITH snaps AS (
+    SELECT snapshot_at FROM raw_overflow_snapshots
+    UNION
+    SELECT snapshot_at FROM raw_cloud_runs
+)
 SELECT snapshot_at,
        LAG(snapshot_at) OVER (ORDER BY snapshot_at) AS previous_snapshot_at,
        DATE_DIFF('minute', LAG(snapshot_at) OVER (ORDER BY snapshot_at), snapshot_at) AS gap_minutes

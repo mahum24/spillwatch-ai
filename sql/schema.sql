@@ -50,3 +50,25 @@ CREATE TABLE IF NOT EXISTS dq_results (
     status     VARCHAR,      -- pass / warn / fail
     message    VARCHAR
 );
+
+-- Cloud collection (GitHub Actions): weekly keyframes + changed overflows only
+CREATE TABLE IF NOT EXISTS raw_overflow_cloud (
+    overflow_id        VARCHAR NOT NULL,
+    company            VARCHAR,
+    status             INTEGER,
+    status_start       TIMESTAMPTZ,
+    latest_event_start TIMESTAMPTZ,
+    latest_event_end   TIMESTAMPTZ,
+    last_updated       TIMESTAMPTZ,
+    snapshot_at        TIMESTAMPTZ NOT NULL,
+    kind               VARCHAR,       -- keyframe / change
+    PRIMARY KEY (overflow_id, snapshot_at)
+);
+
+CREATE TABLE IF NOT EXISTS raw_cloud_runs (
+    snapshot_at  TIMESTAMPTZ,
+    overflows    INTEGER,
+    rows_written INTEGER,
+    keyframe     BOOLEAN,
+    companies    VARCHAR
+);
