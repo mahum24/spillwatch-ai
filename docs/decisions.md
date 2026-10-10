@@ -118,3 +118,18 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 **Evidence:** Laptop sleep lost ~10.5 h of data overnight. Per run, 8–1,200 of 14,199 overflows change, so storing changes instead of full snapshots (~850 KB each) keeps growth to roughly 1–2 MB/day.
 **Public repository:** unlimited free Actions minutes (a private repo would need ~2,900 min/month against a 2,000 free allowance) and doubles as a portfolio. Checked before publishing: no secrets in the full history; the personal reflective log moved to an untracked `private/` folder, since the ICA is an individual assessment and must not be shared or matched by plagiarism checks.
 **Known risk:** GitHub may delay or skip scheduled runs at busy times; gaps are measured in `runs/*.csv` and `fct_collection_gaps`.
+
+### 2026-10-10 — Website: static site on GitHub Pages
+**Decision:** Score live data into JSON (`spillwatch publish`) and serve a static Leaflet site from the `gh-pages` branch, replaced by a single commit on each deploy.
+**Why:** Free, always online, no server to maintain; force-pushing one commit stops ~5.6 MB of regenerated JSON accumulating in git (served gzip-compressed at ~0.7 MB).
+**Found while building:**
+- CARTO basemap tiles now require an API key ("API KEY REQUIRED" watermark); switched to OpenStreetMap tiles.
+- Yorkshire Water publishes "#N/A" as some receiving-water names; the site falls back to the site id.
+- A Southern Water overflow reports continuous spilling since 28 Sept. I first suspected a stale feed, but every company's feed had updated that day. The site now notes spills reported for > 3 days as "a prolonged discharge or a monitor fault", and warns if a company feed is > 24 h old.
+- Headless Chrome cannot render narrower than ~500 px, so phone layouts were tested inside a 390 px iframe.
+
+### 2026-10-10 — Live rainfall must match training rainfall
+**Problem:** All forecast risks were blank at first. The laptop had slept through the last rain day, leaving it incomplete; the 06:00 archive backfill never ran.
+**Fix:** Recent days now come from the readings API (`date=` + `_sorted` paging, ~2 MB/day instead of the ~150 MB archive), re-fetched hourly, so gaps repair themselves after sleep. The API sometimes returns a short page before the end, so paging only stops on an empty page (a day went from 59,997 to the full 88,105 readings).
+**Training/serving skew check:** for the same gauges, daily totals from 15-min readings vs the Hydrology API daily totals used in training: mean 1.51 vs 1.46 mm, dry-day agreement 97%, correlation 0.79. Shifting either source by a day drops correlation to ~0.1, confirming the 09:00 rain-day alignment used in training is correct.
+**To monitor:** in the first live week the model flagged 2.4% of scored spills (rule 0.8%) vs ~1.3% each in evaluation. One week is a small sample; track over time.

@@ -9,3 +9,6 @@ data/
 
 # Personal ICA material: never published (individual assessment)
 private/
+
+# Generated website data (deployed to the gh-pages branch, not tracked on main)
+site/data/

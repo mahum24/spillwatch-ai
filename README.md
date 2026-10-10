@@ -2,6 +2,8 @@
 
 **Using AI to detect suspicious sewage discharges and forecast safe swimming conditions in England's rivers and seas.**
 
+🌊 **Live site: [mahum24.github.io/spillwatch-ai](https://mahum24.github.io/spillwatch-ai/)**
+
 England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million hours. Spills are only permitted during heavy rainfall: discharging in dry weather is illegal and especially harmful. Since 2024 every water company publishes near-real-time overflow status, but nothing flags which spills are *suspicious* or warns people *before* a spill happens. SpillWatch AI aims to do both.
 
 ## Status
@@ -13,7 +15,7 @@ England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million 
 | 3. AI: suspicious-spill detection | Model of expected spilling given rainfall (AUC 0.927), evaluated against the dry-day rule. [Results](docs/results/phase3_dry_spill.md) | ✅ First version |
 | 4. AI: spill forecasting | 1–2 day spill risk; AUC 0.916 / 0.894 with real archived forecasts. [Results](docs/results/phase4_forecast.md) | ✅ First version |
 | 5. AI: river assistant | LLM answering questions over the warehouse | |
-| 6. Frontend | Live map, suspicious spills, swim-safety forecast, impact dashboard | |
+| 6. Frontend | Live map: status now, AI-flagged unexpected spills with explanations, risk today/tomorrow, near-me search. [Live](https://mahum24.github.io/spillwatch-ai/) | ✅ First version |
 
 ## Architecture (Phase 1)
 
@@ -78,6 +80,12 @@ Kept in a separate `data/research.duckdb` so it never blocks the live collector.
 .venv/bin/spillwatch forecast-history # archived rain forecasts for the test period (Open-Meteo)
 .venv/bin/spillwatch train-forecast   # 1-2 day spill forecasting; writes data/models/forecast/
 ```
+
+## Website (Phase 6)
+
+`spillwatch publish` scores live data with both models and writes JSON to `site/data/`; `scripts/deploy_site.sh` publishes `site/` to the `gh-pages` branch (GitHub Pages). It is a static site (Leaflet + vanilla JS), so there is no server to run. Shareable links: `#view=suspicious&site=<overflow id>`.
+
+Currently the scoring runs hourly from the laptop collector; moving it to GitHub Actions is the next step.
 
 ## Data quality
 
