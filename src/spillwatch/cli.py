@@ -11,6 +11,8 @@
     python -m spillwatch.cli rain-history         # download daily rainfall history
     python -m spillwatch.cli build-research       # build the site-day modelling table
     python -m spillwatch.cli train                # train + evaluate the suspicious-spill model
+    python -m spillwatch.cli forecast-history     # download archived rain forecasts (test period)
+    python -m spillwatch.cli train-forecast       # train + evaluate 1-2 day spill forecasting
 """
 
 import argparse
@@ -165,6 +167,39 @@ def cmd_train(_con, _session, _args):
     print(json.dumps({"data": res.data, "prediction": res.prediction}, indent=2))
 
 
+def cmd_forecast_history(_con, session, args):
+    """Download archived forecasts for every 0.25-degree cell holding a test-period site."""
+    import duckdb
+
+    from spillwatch.config import RESEARCH_DB_PATH
+    from spillwatch.ingest import forecasts
+    from spillwatch.ml.forecast import FORECAST_END, FORECAST_START
+
+    con = duckdb.connect(str(RESEARCH_DB_PATH), read_only=True)
+    sites = con.execute("""
+        SELECT DISTINCT s.latitude, s.longitude FROM hist_sites s
+        JOIN (SELECT DISTINCT company, site_id FROM site_day WHERE rain_day >= ?) d USING (company, site_id)
+    """, [FORECAST_START]).fetchall()
+    con.close()
+    cells = sorted({forecasts.cell_of(lat, lon) for lat, lon in sites})
+    forecasts.download(session, cells, FORECAST_START, FORECAST_END, force=args.force)
+
+
+def cmd_train_forecast(_con, _session, _args):
+    from spillwatch.ml import forecast
+
+    res = forecast.run()
+    for h, r in res.items():
+        print(f"\n== Horizon {r['horizon_days']} day(s): {r['test_site_days']:,} test site-days, "
+              f"{r['test_active_rate']:.1%} active")
+        for name, m in r.items():
+            if isinstance(m, dict) and "roc_auc" in m:
+                hit = next(v for k, v in m.items() if k.startswith("hit_rate"))
+                far = next(v for k, v in m.items() if k.startswith("false_alarm"))
+                print(f"  {name:<44} AUC {m['roc_auc']:.3f}  PR-AUC {m['pr_auc']:.3f}  "
+                      f"hit rate {hit:.1%}  false alarms {far:.1%}")
+
+
 def cmd_summary(con, _session, _args):
     queries = {
         "Snapshots collected": "SELECT COUNT(DISTINCT snapshot_at) FROM raw_overflow_snapshots",
@@ -210,10 +245,12 @@ COMMANDS = {
     "rain-history": cmd_rain_history,
     "build-research": cmd_build_research,
     "train": cmd_train,
+    "forecast-history": cmd_forecast_history,
+    "train-forecast": cmd_train_forecast,
 }
 
 # Research commands use their own files/database and never lock the live warehouse
-RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train"}
+RESEARCH_COMMANDS = {"history", "rain-history", "build-research", "train", "forecast-history", "train-forecast"}
 
 
 def main(argv=None):
