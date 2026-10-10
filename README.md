@@ -57,10 +57,13 @@ python3 -m venv .venv
 
 ### Collect continuously
 
-Spill history only exists if the feeds are polled regularly. To collect every 15 minutes with cron (`crontab -e`):
+Spill history only exists if the feeds are polled regularly, so collection runs in two places:
+
+- **Cloud (primary):** the [`Collect overflow data`](.github/workflows/collect.yml) GitHub Actions workflow runs every 15 minutes and commits changed overflows (plus a weekly full keyframe) to the `data` branch. Pull it into the local warehouse with `spillwatch sync-cloud`.
+- **Laptop (backup):** cron runs `scripts/collect.sh` at :07/:22/:37/:52 while the machine is awake:
 
 ```
-7,22,37,52 * * * * "/Users/mac/Documents/Advance Practice/spillwatch-ai/scripts/collect.sh"
+7,22,37,52 * * * * "/path/to/spillwatch-ai/scripts/collect.sh"
 ```
 
 ## Research pipeline (Phase 3)

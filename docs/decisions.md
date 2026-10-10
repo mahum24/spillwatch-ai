@@ -112,3 +112,9 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 ### 2026-10-10 — Laptop sleep stops collection
 **Evidence:** The Mac slept on battery from ~23:30 to 10:03; no collection ran and training was paused for ~10.5 h (5.6 min of CPU in 10.6 h wall-clock).
 **Decision:** Move live collection to a cloud scheduler before the frontend goes public.
+
+### 2026-10-10 — Cloud collection with GitHub Actions
+**Decision:** A scheduled workflow (every 15 min, offset to :07) collects all feeds and commits only changed overflows (7 columns) plus a weekly full keyframe to a `data` branch. The laptop cron stays as a backup; both feed the same event model.
+**Evidence:** Laptop sleep lost ~10.5 h of data overnight. Per run, 8–1,200 of 14,199 overflows change, so storing changes instead of full snapshots (~850 KB each) keeps growth to roughly 1–2 MB/day.
+**Public repository:** unlimited free Actions minutes (a private repo would need ~2,900 min/month against a 2,000 free allowance) and doubles as a portfolio. Checked before publishing: no secrets in the full history; the personal reflective log moved to an untracked `private/` folder, since the ICA is an individual assessment and must not be shared or matched by plagiarism checks.
+**Known risk:** GitHub may delay or skip scheduled runs at busy times; gaps are measured in `runs/*.csv` and `fct_collection_gaps`.

@@ -1,0 +1,59 @@
+name: Collect overflow data
+
+# Polls every water company's live storm overflow feed and commits the changes to
+# the `data` branch. Runs at :07/:22/:37/:52 to avoid feeds that reload on the
+# hour/half hour. GitHub may delay scheduled runs at busy times; gaps are visible
+# in runs/runs_YYYY-MM.csv and in the local fct_collection_gaps table.
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out data branch
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: cloud-data
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install
+        run: pip install --quiet -e .
+
+      - name: Collect
+        run: spillwatch cloud-collect --data-dir cloud-data
+
+      - name: Commit and push changes
+        working-directory: cloud-data
+        run: |
+          git config user.name "spillwatch-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit --quiet -m "data: collection at $(date -u +%Y-%m-%dT%H:%MZ)"
+          for attempt in 1 2 3; do
+            git push --quiet origin HEAD:data && exit 0
+            git pull --quiet --rebase origin data
+          done
+          exit 1
