@@ -14,7 +14,7 @@ England's storm overflows spilled 291,492 times in 2025, for nearly 1.9 million 
 | 2. Orchestration & quality | Scheduled collection, 11 data-quality checks, collector gaps, monitor status changes | ✅ Done |
 | 3. AI: suspicious-spill detection | Model of expected spilling given rainfall (AUC 0.927), evaluated against the dry-day rule. [Results](docs/results/phase3_dry_spill.md) | ✅ First version |
 | 4. AI: spill forecasting | 1–2 day spill risk; AUC 0.916 / 0.894 with real archived forecasts. [Results](docs/results/phase4_forecast.md) | ✅ First version |
-| 5. AI: river assistant | LLM answering questions over the warehouse | |
+| 5. AI: river assistant | Gemini answering questions through five tools over the live data, with a test suite of 28 questions including trap questions. [Details](#assistant-phase-5) | 🚧 Built, evaluation pending |
 | 6. Frontend | Live map: status now, AI-flagged unexpected spills with explanations, risk today/tomorrow, near-me search. [Live](https://mahum24.github.io/spillwatch-ai/) | ✅ First version |
 
 ## Architecture (Phase 1)
@@ -86,6 +86,34 @@ Kept in a separate `data/research.duckdb` so it never blocks the live collector.
 `spillwatch publish` scores live data with both models and writes JSON to `site/data/`; `scripts/deploy_site.sh` publishes `site/` to the `gh-pages` branch (GitHub Pages). It is a static site (Leaflet + vanilla JS), so there is no server to run. Shareable links: `#view=suspicious&site=<overflow id>`.
 
 In production the [`Score and publish site`](.github/workflows/publish.yml) workflow does this hourly in GitHub Actions: it rebuilds a warehouse from the `data` branch plus the live feeds, downloads the trained models from the [`models-v1` release](https://github.com/mahum24/spillwatch-ai/releases/tag/models-v1), scores, and deploys to GitHub Pages. `scripts/deploy_site.sh` remains for manual deploys from a laptop.
+
+## Assistant (Phase 5)
+
+"Ask SpillWatch AI" on the website answers plain-English questions ("Is anything spilling near Hebden Bridge?", "Why was this overflow flagged?") using Google Gemini with **function calling**. The model never sees the raw data: it can only call five tools that run in the visitor's browser over the data the map has loaded:
+
+| Tool | Does |
+|---|---|
+| `geocode` | Place name or postcode → coordinates (postcodes.io, open data) |
+| `get_summary` | National or per-company totals, feed freshness, model scores |
+| `search_overflows` | Filter by distance, company, river, status or risk; returns totals for all matches |
+| `get_overflow` | One overflow's status, history, risk and caveats |
+| `list_unexpected_spills` | AI-flagged / dry-day-rule spills with rainfall and explanations |
+
+Answers cite overflows as `[[id]]`, which become "show on map" links, and every answer shows the steps it took.
+
+**Keys.** Questions go to a small [Cloudflare Worker](worker/src/index.js) that holds a free-tier Gemini key as a secret. The Worker builds the prompt and tool list itself (callers can only send the conversation), allows only the site's origin and rate-limits each visitor, so the key cannot be reused as a free general-purpose proxy. Visitors can also add their own free Gemini key in the assistant's settings; it is stored only in their browser and sent straight to Google.
+
+**One implementation everywhere.** [`site/assistant/tools.js`](site/assistant/tools.js) (tools, prompt, request) and [`agent.js`](site/assistant/agent.js) (the tool loop) are shared by the website, the Worker and the evaluation harness.
+
+**Evaluation (RQ3).** [`eval/assistant/`](eval/assistant/) asks 28 questions in 7 categories (lookups, places, single sites, anomalies, forecasts, method, and *traps*: legality, swimming safety, next week, E. coli, an unknown company, a false premise, off-topic). Expected answers are computed from a frozen data snapshot with the same tool code. Each answer is scored for correctness and **grounding**: every number in it must appear in a tool output. The same questions run with no tools give the ungrounded baseline.
+
+```bash
+npm test                                            # tool, loop and Worker tests (no key needed)
+GEMINI_API_KEY=... npm run eval:assistant           # or put GEMINI_API_KEY=... in .env
+npm run eval:assistant -- --mode notools            # baseline without tools
+```
+
+Deploying the Worker: `cd worker && npx wrangler login && npx wrangler secret put GEMINI_API_KEY && npx wrangler deploy`, then put its URL in the `spillwatch-assistant` meta tag in `site/index.html`.
 
 ## Data quality
 

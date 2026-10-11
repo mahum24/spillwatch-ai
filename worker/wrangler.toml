@@ -1,0 +1,18 @@
+name = "spillwatch-assistant"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+ALLOWED_ORIGINS = "https://mahum24.github.io"
+
+# 20 model calls per visitor per minute (one question is usually 2-3 calls).
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+
+# The key is a secret, never in this file:  npx wrangler secret put GEMINI_API_KEY

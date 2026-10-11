@@ -1,0 +1,9 @@
+{
+  "name": "spillwatch-ai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/js/*.test.mjs",
+    "eval:assistant": "node eval/assistant/run.mjs"
+  }
+}

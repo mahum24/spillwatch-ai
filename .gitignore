@@ -12,3 +12,6 @@ private/
 
 # Generated website data (deployed to the gh-pages branch, not tracked on main)
 site/data/
+
+# Assistant evaluation data snapshots (large; regenerated from site/data)
+eval/assistant/snapshots/
