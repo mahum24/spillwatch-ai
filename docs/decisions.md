@@ -143,3 +143,14 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 - The readings API keeps only ~4 weeks (15 Sept available, 10 Sept empty on 10 Oct), so older missing days fall back to the daily archive file; each is fetched once and then stored.
 - `SPILLWATCH_DATA_DIR` lets the job (and a local rehearsal) run in an isolated directory. The rehearsal ran the whole job from an empty directory in 2.5 min (first run, including 7 archive days).
 **Known difference:** cloud event history starts on 10 Oct, so its 7-day counts were initially lower than the laptop's (2,917 vs 3,392 spills); this closes as history accumulates.
+
+### 2026-10-11 — Assistant: Gemini function calling, tools in the browser, key in a Worker
+**Decision:** Gemini (free tier, `gemini-3.5-flash-lite` by default) with five narrow tools, not retrieval over text or SQL generation. A Cloudflare Worker holds the shared key; visitors may add their own key instead.
+**Why tools, not text-to-SQL:** the questions the public asks map onto a few well-defined lookups; fixed tools cannot run arbitrary queries, are easy to test, and make every number traceable to a tool output, which is what the grounding metric measures.
+**Why the tools run in the browser:** the site is static and already holds the data, so a question costs no server work; the Worker only forwards to Gemini.
+**Key handling considered:**
+- *Visitor's own key only:* no cost or server, but most visitors (e.g. examiners, employers) have no key and would never see the feature work.
+- *Shared key in the page:* would be copied within days.
+- *Chosen:* the Worker keeps the key secret, fixes the prompt and tools so it is useless as a general proxy, accepts only the site's origin, and rate-limits per IP. If the shared free allowance runs out, the site asks visitors to add their own key, which goes straight from their browser to Google.
+**Privacy:** Google may use free-tier prompts to improve its models. Only public data and the visitor's question are sent; the site says so next to the key field.
+**Evaluation design:** expected answers are recomputed from a frozen snapshot, so the suite is reusable; trap questions test refusal and premise correction, not just accuracy; a no-tools run on the same questions is the baseline.

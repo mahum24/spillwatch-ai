@@ -208,6 +208,7 @@ async function load() {
     if (!state.susById.has(s.id)) state.susById.set(s.id, []);
     state.susById.get(s.id).push(s);
   }
+  state.summary = summary;
   state.feeds = summary.feeds || {};
   const n = (x) => x.toLocaleString("en-GB");
   document.getElementById("kpiNow").textContent = n(summary.spilling_now);
@@ -240,7 +241,12 @@ document.getElementById("list").addEventListener("click", (e) => {
 document.getElementById("nearBtn").addEventListener("click", nearMe);
 document.getElementById("aboutBtn").addEventListener("click", () => document.getElementById("about").showModal());
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
-load().catch((err) => {
+// The assistant (assistant/chat.js) reuses the loaded data and can open an overflow on the map.
+window.SpillWatch = {
+  select,
+  ready: load().then(() => ({ data: { overflows: state.overflows, suspicious: state.suspicious, summary: state.summary, byId: state.byId } })),
+};
+window.SpillWatch.ready.catch((err) => {
   document.getElementById("updated").textContent = "Could not load data";
   console.error(err);
 });
