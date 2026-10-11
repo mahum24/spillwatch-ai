@@ -15,3 +15,5 @@ site/data/
 
 # Assistant evaluation data snapshots (large; regenerated from site/data)
 eval/assistant/snapshots/
+node_modules/
+.wrangler/
