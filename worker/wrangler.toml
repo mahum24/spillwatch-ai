@@ -15,4 +15,11 @@ namespace_id = "1001"
   limit = 20
   period = 60
 
-# The key is a secret, never in this file:  npx wrangler secret put GEMINI_API_KEY
+# Start the GitHub Actions workflows on time (see SCHEDULE in src/index.js). Needs the
+# GITHUB_TOKEN secret: a fine-grained token with "Actions: read and write" on this repo only.
+[triggers]
+crons = ["7,22,37,52 * * * *", "12 * * * *"]
+
+# Secrets are never in this file:
+#   npx wrangler secret put GEMINI_API_KEY
+#   npx wrangler secret put GITHUB_TOKEN

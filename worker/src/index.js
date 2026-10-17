@@ -4,6 +4,9 @@
 // prompt and tool list itself (from the same tools.js the website uses); callers can only
 // send the conversation. That, a per-visitor rate limit and an origin allow-list stop the
 // key being reused as a general-purpose free Gemini proxy.
+//
+// The same Worker also runs on a schedule (Cron Triggers) and starts the GitHub Actions
+// workflows on time, because GitHub's own scheduler delays them by hours on this repo.
 
 import { buildRequest } from "../../site/assistant/tools.js";
 
@@ -37,7 +40,34 @@ function validContents(contents) {
   return contents[contents.length - 1].role === "user";
 }
 
+// Which workflow each cron expression (worker/wrangler.toml) starts.
+export const SCHEDULE = {
+  "7,22,37,52 * * * *": "collect.yml",
+  "12 * * * *": "publish.yml",
+};
+
+export async function dispatchWorkflow(workflow, env, fetchFn = fetch) {
+  const repo = env.GITHUB_REPO || "mahum24/spillwatch-ai";
+  const r = await fetchFn(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      accept: "application/vnd.github+json",
+      "x-github-api-version": "2022-11-28",
+      "user-agent": "spillwatch-scheduler",
+    },
+    body: JSON.stringify({ ref: "main" }),
+  });
+  if (r.status !== 204) throw new Error(`GitHub dispatch of ${workflow} failed: ${r.status} ${(await r.text()).slice(0, 200)}`);
+}
+
 export default {
+  async scheduled(event, env) {
+    const workflow = SCHEDULE[event.cron];
+    if (!workflow || !env.GITHUB_TOKEN) return;
+    await dispatchWorkflow(workflow, env);
+  },
+
   async fetch(request, env) {
     const origin = allowedOrigin(request.headers.get("origin"), env);
     const url = new URL(request.url);
@@ -52,7 +82,9 @@ export default {
         },
       });
     }
-    if (url.pathname === "/health") return json({ ok: true, model: env.GEMINI_MODEL }, 200, origin);
+    if (url.pathname === "/health") {
+      return json({ ok: true, model: env.GEMINI_MODEL, assistant_ready: !!env.GEMINI_API_KEY, scheduler_ready: !!env.GITHUB_TOKEN }, 200, origin);
+    }
     if (url.pathname !== "/chat" || request.method !== "POST") return fail(404, "Not found", origin);
     if (!origin) return fail(403, "This assistant only serves the SpillWatch website.", null);
     if (!env.GEMINI_API_KEY) return fail(503, "The assistant is not configured yet.", origin);
