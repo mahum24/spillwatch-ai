@@ -194,7 +194,7 @@ async function submit(raw) {
     pending.classList.add("error");
     const badKey = key && err instanceof ModelError && (err.status === 400 || err.status === 403) && /key/i.test(err.message);
     pending.innerHTML = esc(badKey ? "Google rejected your API key. Check it in settings (⚙)." : err.message || "Something went wrong.")
-      + (!key && err.status === 429 ? ' <button type="button" class="link-btn" data-open-settings>Add your own key</button>' : "");
+      + (!key && (err.status === 429 || err.status === 503) ? ' <button type="button" class="link-btn" data-open-settings>Add your own key</button>' : "");
     pending.querySelector("[data-open-settings]")?.addEventListener("click", () => toggleSettings(true));
     console.error(err);
   } finally {

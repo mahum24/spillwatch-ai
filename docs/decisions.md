@@ -154,3 +154,9 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 - *Chosen:* the Worker keeps the key secret, fixes the prompt and tools so it is useless as a general proxy, accepts only the site's origin, and rate-limits per IP. If the shared free allowance runs out, the site asks visitors to add their own key, which goes straight from their browser to Google.
 **Privacy:** Google may use free-tier prompts to improve its models. Only public data and the visitor's question are sent; the site says so next to the key field.
 **Evaluation design:** expected answers are recomputed from a frozen snapshot, so the suite is reusable; trap questions test refusal and premise correction, not just accuracy; a no-tools run on the same questions is the baseline.
+
+### 2026-10-17 — Start the GitHub workflows from a Cloudflare timer
+**Problem:** after GitHub's scheduler started (10 Oct), scheduled runs arrived every 3–6 hours instead of every 15 minutes (collection) and hourly (publishing), e.g. collection at 15:33, 19:29, 22:52, 01:47 and 07:52 UTC. The laptop backup only covers hours when it is awake.
+**Decision:** the assistant's Cloudflare Worker also has Cron Triggers that call GitHub's `workflow_dispatch` API on the intended schedule. GitHub's own `schedule:` stays as a fallback; the workflows' concurrency groups stop overlapping runs.
+**Why this option:** no extra service or account (the Worker already exists, and Cron Triggers are free); the token is fine-grained, limited to this repository and to Actions, stored as a Worker secret. An external cron website was the alternative but needs another account holding a token.
+**Risk:** the token expires; `/health` reports `scheduler_ready`, and the README explains renewal.

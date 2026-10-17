@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runTool, buildRequest, TOOL_DECLARATIONS, overflowName } from "../../site/assistant/tools.js";
 import { ask, trimHistory } from "../../site/assistant/agent.js";
-import worker from "../../worker/src/index.js";
+import worker, { SCHEDULE, dispatchWorkflow } from "../../worker/src/index.js";
+import fs from "node:fs";
 
 const overflows = [
   { id: "yorkshire:A1", company: "yorkshire", site: "A1", water: "RIVER CALDER", lat: 53.742, lon: -2.012, status: 1, since: "2026-10-10T08:00Z", spills_7d: 4, hours_7d: 10.5, flagged_7d: 1, risk_today: 0.91, risk_tomorrow: 0.62, level_today: "high", level_tomorrow: "high", rain_fc_today_mm: 9, rain_fc_tomorrow_mm: 4, history: true },
@@ -169,4 +170,24 @@ test("worker turns Google quota errors into a friendly 429", async () => {
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test("scheduler crons in wrangler.toml match the workflows the Worker starts", () => {
+  const toml = fs.readFileSync(new URL("../../worker/wrangler.toml", import.meta.url), "utf8");
+  const crons = JSON.parse(/crons = (\[.*\])/.exec(toml)[1]);
+  assert.deepEqual(crons.sort(), Object.keys(SCHEDULE).sort());
+  for (const wf of Object.values(SCHEDULE)) assert.ok(fs.existsSync(new URL(`../../.github/workflows/${wf}`, import.meta.url)), wf);
+});
+
+test("dispatch calls the GitHub API with the token and reports failures", async () => {
+  let call;
+  await dispatchWorkflow("collect.yml", { GITHUB_TOKEN: "t" }, async (url, init) => { call = { url, init }; return new Response(null, { status: 204 }); });
+  assert.equal(call.url, "https://api.github.com/repos/mahum24/spillwatch-ai/actions/workflows/collect.yml/dispatches");
+  assert.equal(call.init.headers.authorization, "Bearer t");
+  assert.deepEqual(JSON.parse(call.init.body), { ref: "main" });
+  await assert.rejects(dispatchWorkflow("x.yml", { GITHUB_TOKEN: "t" }, async () => new Response("bad", { status: 401 })), /401/);
+});
+
+test("scheduled run does nothing without a token", async () => {
+  await worker.scheduled({ cron: "12 * * * *" }, {}); // must not throw or call out
 });

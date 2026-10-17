@@ -77,6 +77,8 @@
     <p>On held-out data it separates spill days from dry days with an AUC of <span data-metric="suspicion_auc"></span>. Compared with the simple "dry-day" rule (less than 0.25 mm of rain on the day and the day before), it also catches spills after light rain that the rule cannot: <span data-metric="suspicion_light_rain_recall" data-pct></span> of simulated weather-independent spills in light rain, against 0% for the rule.</p>
     <h3>2. Spill risk today and tomorrow</h3>
     <p>A second model combines recent rainfall, whether the overflow is already spilling and the latest weather forecast. Tested with the forecasts that were actually available at the time, it reaches an AUC of <span data-metric="forecast_auc_today"></span> for today and <span data-metric="forecast_auc_tomorrow"></span> for tomorrow.</p>
+    <h3>3. Ask SpillWatch AI</h3>
+    <p>The assistant answers questions in plain English using Google Gemini. It can only look things up through a few fixed tools over SpillWatch's own data (places, overflows, unexpected spills, national figures), and every answer shows which steps it took and links to the overflows it used. It can be wrong; check the map.</p>
     <h3>Limitations</h3>
     <ul>
       <li>An unexpected spill is <strong>not proof of illegal activity</strong>. Monitors can fail, and local rain can be missed by gauges up to 10 km away.</li>

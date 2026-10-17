@@ -239,7 +239,7 @@ When it shows `Enter a secret value:`, paste the key and press <kbd>Enter</kbd> 
 npx wrangler deploy                          # still inside worker/
 ```
 
-It prints an address like `https://spillwatch-assistant.<your-subdomain>.workers.dev`. Check it: open `<that address>/health` in a browser; it should show `{"ok":true,...}`.
+It prints an address like `https://spillwatch-assistant.<your-subdomain>.workers.dev`. Check it: open `<that address>/health` in a browser; it should show `"ok":true` and `"assistant_ready":true`.
 
 If your site is not at `mahum24.github.io`, change `ALLOWED_ORIGINS` in `worker/wrangler.toml` to your site's address (for example `https://<your-username>.github.io`) and deploy again; the server refuses requests from any other website.
 
@@ -253,7 +253,26 @@ In `site/index.html`, put the address in the `spillwatch-assistant` tag:
 
 Commit and push. The site updates on its next publish run (or run *Score and publish site* by hand). Then open the site, click **Ask SpillWatch AI** and try an example question.
 
-#### 8e. Key for the evaluation script
+#### 8e. Make GitHub's jobs run on time (GitHub token)
+
+GitHub often runs scheduled workflows hours late. The same Cloudflare Worker has a timer (Cron Triggers, in `worker/wrangler.toml`) that starts *Collect overflow data* at :07/:22/:37/:52 and *Score and publish site* at :12, using a GitHub token that can only run this repository's workflows:
+
+1. Open **[github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)** (fine-grained token).
+2. *Token name:* `spillwatch-scheduler` · *Expiration:* the longest offered (note the date: the timer stops when it expires).
+3. *Repository access:* **Only select repositories** → `spillwatch-ai`.
+4. *Permissions → Repository permissions → Actions:* **Read and write**. Leave everything else as "No access".
+5. **Generate token** and copy it (it starts with `github_pat_`).
+6. Store it on the Worker and deploy:
+   ```bash
+   cd worker
+   npx wrangler secret put GITHUB_TOKEN       # paste the token at the prompt
+   npx wrangler deploy
+   ```
+7. Check: `<worker address>/health` shows `"scheduler_ready":true`, and after 15 minutes the [Actions tab](https://github.com/mahum24/spillwatch-ai/actions) shows runs with the event **workflow_dispatch** every 15 minutes.
+
+When the token expires, create a new one the same way and repeat step 6.
+
+#### 8f. Key for the evaluation script
 
 The evaluation runs on your computer and reads the key from a file called `.env` in the `spillwatch-ai` folder (git ignores this file, so it is never uploaded). Create it in a text editor, saved as plain text, containing one line:
 
@@ -266,9 +285,10 @@ Then run:
 ```bash
 npm run eval:assistant                       # 28 test questions with tools
 npm run eval:assistant -- --mode notools     # the same questions without tools (baseline)
+npm run report:assistant                     # write docs/results/phase5_assistant.md
 ```
 
-Results are saved in `docs/results/assistant/`.
+Raw answers are saved in `docs/results/assistant/`; the report summarises every complete run on the newest snapshot.
 
 ### 9. Replace a Gemini key (lost, leaked or expired)
 
@@ -302,6 +322,7 @@ If a key was committed to git by mistake, deleting the key (step 1) is what matt
 | `cd: no such file or directory: worker` | You are in the wrong folder. `cd` into `spillwatch-ai` first. |
 | `Required Worker name missing` | Run wrangler from inside `worker/` (where `wrangler.toml` is). |
 | Assistant says "not configured yet" | The secret is missing: redo step 8b. |
+| Cloud jobs run only every few hours | The scheduler token is missing or expired: step 8e. `<worker address>/health` shows `scheduler_ready`. |
 | Assistant says the shared allowance is used up | The free key hit Google's limit; wait (limits reset daily) or add your own key in ⚙. |
 | Assistant says "only serves the SpillWatch website" | Your site's address is not in `ALLOWED_ORIGINS` (step 8c). |
 | Website shows "Could not load data" | The publish workflow has not run yet, or failed: check the Actions tab. |
