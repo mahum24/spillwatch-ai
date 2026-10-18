@@ -117,7 +117,7 @@ All commands below are run from this `spillwatch-ai` folder unless they say othe
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest -q          # Python tests: should end with "27 passed"
-npm test                     # assistant tests: should end with "# pass 16" and "# fail 0"
+npm test                     # assistant tests: should end with "# pass 19" and "# fail 0"
 ```
 
 If `pytest` says `No module named 'spillwatch'`, you ran a different Python: always use `.venv/bin/...`.
