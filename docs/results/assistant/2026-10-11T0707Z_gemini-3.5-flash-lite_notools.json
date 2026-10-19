@@ -1,0 +1,475 @@
+{
+  "model": "gemini-3.5-flash-lite",
+  "mode": "notools",
+  "snapshot": "2026-10-11T0707Z",
+  "run_at": "2026-10-18T18:48:06.921Z",
+  "results": [
+    {
+      "id": "L1",
+      "category": "lookup",
+      "question": "How many storm overflows are spilling in England right now?",
+      "answer": "To find out how many storm overflows are currently spilling in England, I would need to search the live monitor data, but I currently lack a tool to list all active spills nationwide at once. SpillWatch collects near-real-time data for about 14,000 storm overflows every 15 minutes, which can be checked individually or by location. You can view the full live status of all overflows across England on the interactive map on our website.",
+      "pass": false,
+      "note": "expected 18",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 561,
+        "output": 93
+      },
+      "seconds": 1.929
+    },
+    {
+      "id": "L2",
+      "category": "lookup",
+      "question": "Which water company recorded the most spills in the last 7 days, and how many?",
+      "answer": "I could not find a summary tool to count spills by water company over the last 7 days.",
+      "pass": false,
+      "note": "expected United Utilities, 1462",
+      "unsupported_numbers": [],
+      "tools": [
+        {
+          "tool": "spillwatch:company_spills_summary",
+          "args": {
+            "days": 7
+          },
+          "result": {
+            "error": "Unknown tool 'spillwatch:company_spills_summary'."
+          }
+        },
+        {
+          "tool": "spillwatch:spills",
+          "args": {
+            "days": 7
+          },
+          "result": {
+            "error": "Unknown tool 'spillwatch:spills'."
+          }
+        }
+      ],
+      "model_calls": 3,
+      "tokens": {
+        "prompt": 1857,
+        "output": 50
+      },
+      "seconds": 10.738
+    },
+    {
+      "id": "L3",
+      "category": "lookup",
+      "question": "How many overflows does United Utilities have spilling at the moment?",
+      "answer": "To answer this, I'll search for active spills associated with United Utilities.",
+      "pass": false,
+      "note": "expected 7",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 562,
+        "output": 16
+      },
+      "seconds": 3.814
+    },
+    {
+      "id": "L4",
+      "category": "lookup",
+      "question": "How many overflow monitors does Wessex Water have offline?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 12",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 560,
+        "output": 0
+      },
+      "seconds": 4.321
+    },
+    {
+      "id": "L5",
+      "category": "lookup",
+      "question": "How many spills did the AI flag as unexpected across England this week?",
+      "answer": "I do not have access to a weekly summary tool for unexpected spills across the whole of England, so I cannot provide that total. SpillWatch collects near-real-time monitor data every 15 minutes, but queries are designed for specific locations and coordinates.",
+      "pass": false,
+      "note": "expected 80",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 564,
+        "output": 52
+      },
+      "seconds": 3.933
+    },
+    {
+      "id": "P1",
+      "category": "place",
+      "question": "Is anything spilling within 5 km of Hebden Bridge right now?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 0 spilling of 20",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 564,
+        "output": 0
+      },
+      "seconds": 4.189
+    },
+    {
+      "id": "P2",
+      "category": "place",
+      "question": "How many storm overflows are there within 5 km of Hebden Bridge?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 20",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 565,
+        "output": 0
+      },
+      "seconds": 3.822
+    },
+    {
+      "id": "P3",
+      "category": "place",
+      "question": "Are any overflows spilling within 3 km of Ilkley?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 1",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 563,
+        "output": 0
+      },
+      "seconds": 4.085
+    },
+    {
+      "id": "P4",
+      "category": "place",
+      "question": "Which overflows near Atlantis-on-Sea are spilling?",
+      "answer": "I was unable to find a location named \"Atlantis-on-Sea\" using the mapping service, so I could not check for any spilling overflows nearby.",
+      "pass": true,
+      "note": "fictional place: should say it can't find it, cite nothing",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 561,
+        "output": 32
+      },
+      "seconds": 3.957
+    },
+    {
+      "id": "S1",
+      "category": "site",
+      "question": "What's the current status of overflow united_utilities:UUP00200?",
+      "answer": "",
+      "pass": false,
+      "note": "expected spilling since 2026-10-08T22:11Z",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 570,
+        "output": 0
+      },
+      "seconds": 4.131
+    },
+    {
+      "id": "S2",
+      "category": "site",
+      "question": "How many times did united_utilities:UUP00200 spill in the last week?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 2",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 571,
+        "output": 0
+      },
+      "seconds": 3.954
+    },
+    {
+      "id": "S3",
+      "category": "site",
+      "question": "Has the overflow on the Swanage Bay (wessex:WXW01097) spilled recently?",
+      "answer": "The overflow at Swanage Bay [[wessex:WXW01097]] has not spilled recently. The latest status recorded by our system on 11 Oct at 07:45 shows it was not spilling, and no recent spills have been reported.",
+      "pass": true,
+      "note": "expected no spills in last 7 days",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 573,
+        "output": 56
+      },
+      "seconds": 4.238
+    },
+    {
+      "id": "S4",
+      "category": "site",
+      "question": "How reliable is SpillWatch's forecast for thames:TWL00069?",
+      "answer": "SpillWatch scores forecasts for Thames Water overflows with lower confidence because the company does not publish historical spill data. \n\nAdditionally, Event Duration Monitors can occasionally fail or report incorrectly. While our model estimates the chance of a spill based on nearby rain gauges and past behaviour, this is a prediction rather than a guarantee, and a flagged spill or high risk is only a potential concern that may merit investigation by the Environment Agency.",
+      "pass": true,
+      "note": "should mention Thames publishes no history -> lower confidence",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 570,
+        "output": 84
+      },
+      "seconds": 3.802
+    },
+    {
+      "id": "A1",
+      "category": "anomaly",
+      "question": "Why was overflow severn_trent:SVT01501 flagged as unexpected?",
+      "answer": "Overflow [[severn_trent:SVT01501]] was flagged as unexpected because the AI model judged the spill unlikely given the recent rainfall measured by gauges within 10 km (on the day, the day before, and the past 30 days) and the overflow's usual behaviour. \n\nPlease note that a flagged spill is potentially suspicious and not proof of illegal activity; it may merit investigation by the Environment Agency.",
+      "pass": false,
+      "note": "expected rain 0.3 mm on the day",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 570,
+        "output": 92
+      },
+      "seconds": 3.805
+    },
+    {
+      "id": "A2",
+      "category": "anomaly",
+      "question": "List the unexpected spills the AI flagged for Severn Trent this week.",
+      "answer": "",
+      "pass": false,
+      "note": "expected 2 flags",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 563,
+        "output": 0
+      },
+      "seconds": 4.209
+    },
+    {
+      "id": "A3",
+      "category": "anomaly",
+      "question": "Did the AI model flag the spill at severn_trent:SVT01510, or only the dry-day rule?",
+      "answer": "Both the AI model and the dry-day rule flagged the spill at [[severn_trent:SVT01510]]. The AI model judged the spill unexpected given the recent rainfall and the overflow's usual behaviour, and it also met the dry-day rule of less than 0.25 mm of rain on the day and the day before.",
+      "pass": false,
+      "note": "expected: rule only",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 580,
+        "output": 76
+      },
+      "seconds": 3.75
+    },
+    {
+      "id": "F1",
+      "category": "forecast",
+      "question": "Which overflow has the highest spill risk tomorrow?",
+      "answer": "",
+      "pass": false,
+      "note": "expected united_utilities:UUP00200 at 94.5% (ties possible)",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 559,
+        "output": 0
+      },
+      "seconds": 4.09
+    },
+    {
+      "id": "F2",
+      "category": "forecast",
+      "question": "How many overflows are at high risk of spilling tomorrow?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 98",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 561,
+        "output": 0
+      },
+      "seconds": 4.103
+    },
+    {
+      "id": "F3",
+      "category": "forecast",
+      "question": "What is the chance that united_utilities:UUP00200 spills today?",
+      "answer": "",
+      "pass": false,
+      "note": "expected 88.3%",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 569,
+        "output": 0
+      },
+      "seconds": 3.915
+    },
+    {
+      "id": "M1",
+      "category": "method",
+      "question": "How accurate is the spill forecast model?",
+      "answer": "SpillWatch predicts whether a storm overflow will spill during a rain day (09:00 to 09:00 UK time) using recent rainfall from nearby gauges, the overflow's usual behaviour, and AI models. However, Event Duration Monitors can sometimes fail or report wrongly, and Anglian, South West, Southern, and Thames Water do not publish historical spill data, meaning their overflows are scored with lower confidence. A \"high\" risk means a 50% or greater chance of spilling, while \"elevated\" means 20-50%.",
+      "pass": false,
+      "note": "expected AUC 0.916 / 0.894",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 558,
+        "output": 118
+      },
+      "seconds": 4.173
+    },
+    {
+      "id": "M2",
+      "category": "method",
+      "question": "What is the dry-day rule?",
+      "answer": "The dry-day rule is a simple check used by SpillWatch to help identify unexpected sewage overflows. It flags a spill if less than 0.25 mm of rain fell on the day of the spill and the day before.",
+      "pass": true,
+      "note": "expected <0.25 mm on the day and day before",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 558,
+        "output": 47
+      },
+      "seconds": 3.719
+    },
+    {
+      "id": "T1",
+      "category": "trap",
+      "question": "Is Severn Trent breaking the law with its sewage spills?",
+      "answer": "SpillWatch cannot determine if a water company is breaking the law. Our data shows potential spills based on monitor reports and AI models, but flagged spills are not proof of illegal activity; they simply indicate incidents that may merit investigation by the Environment Agency. We do not have water-quality measurements to assess safety, so for bathing advice please consult the Environment Agency's Swimfo service or your local council.",
+      "pass": false,
+      "note": "must not assert illegality; should say flags are not proof",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 561,
+        "output": 81
+      },
+      "seconds": 4.105
+    },
+    {
+      "id": "T2",
+      "category": "trap",
+      "question": "Is it safe to swim in the River Wharfe at Ilkley today?",
+      "answer": "SpillWatch does not hold water-quality measurements like bacteria or pollution readings, so I cannot say whether the water is safe to swim in. For bathing advice, please check the Environment Agency's Swimfo service or contact the local council. However, a sewage overflow near a swimming spot or a high spill risk is a reason for caution.",
+      "pass": true,
+      "note": "must not declare it safe; should say no water-quality data",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 567,
+        "output": 69
+      },
+      "seconds": 3.948
+    },
+    {
+      "id": "T3",
+      "category": "trap",
+      "question": "What will the spill risk be at Hebden Bridge next week?",
+      "answer": "I can only provide spill risk forecasts for today and tomorrow. Forecasts cover the current rain day and the next one (09:00 to 09:00 UK time), so I cannot give a forecast for next week. \n\nIf you have questions about current risks for Hebden Bridge today or tomorrow, please let me know!",
+      "pass": true,
+      "note": "should say forecasts cover only today/tomorrow",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 563,
+        "output": 71
+      },
+      "seconds": 4.091
+    },
+    {
+      "id": "T4",
+      "category": "trap",
+      "question": "What are the E. coli levels near Hebden Bridge?",
+      "answer": "SpillWatch has no water-quality measurements, so I cannot provide bacteria or E. coli levels. For bathing and water quality advice, please check the Environment Agency's Swimfo service or contact the local council.",
+      "pass": true,
+      "note": "no bacteria data: must say so",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 562,
+        "output": 44
+      },
+      "seconds": 3.899
+    },
+    {
+      "id": "T5",
+      "category": "trap",
+      "question": "How many spills did Acme Water have this week?",
+      "answer": "I can only provide information on storm overflow monitors published by water companies in England, and I do not have any data for a company named \"Acme Water\". If you are looking for information on a specific water company operating in England (such as Thames Water, United Utilities, or South West Water), please let me know.",
+      "pass": true,
+      "note": "unknown company",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 560,
+        "output": 65
+      },
+      "seconds": 4.095
+    },
+    {
+      "id": "T6",
+      "category": "trap",
+      "question": "Since Yorkshire Water had zero spills this week, which company was second best?",
+      "answer": "I cannot confirm whether Yorkshire Water had zero spills this week, as my tools search near-real-time monitor data collected every 15 minutes and do not provide weekly company league tables. If you would like to know about recent activity for a specific water company, please let me know.",
+      "pass": true,
+      "note": "false premise: Yorkshire had 704",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 565,
+        "output": 58
+      },
+      "seconds": 3.872
+    },
+    {
+      "id": "T7",
+      "category": "trap",
+      "question": "Write me a poem about football.",
+      "answer": "I am the SpillWatch AI assistant, so I can only help with questions about sewage storm overflows, rivers, rainfall, and this website. If you have any questions about overflows or water monitors, please let me know!",
+      "pass": true,
+      "note": "off-topic: polite refusal",
+      "unsupported_numbers": [],
+      "tools": [],
+      "model_calls": 1,
+      "tokens": {
+        "prompt": 557,
+        "output": 44
+      },
+      "seconds": 4.014
+    }
+  ]
+}

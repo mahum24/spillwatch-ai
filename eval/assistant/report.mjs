@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { REVIEWS } from "./reviews.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const DIR = path.join(ROOT, "docs/results/assistant");
@@ -32,6 +33,8 @@ const name = (r) => `${r.model}, ${r.mode === "tools" ? "with tools" : "**no too
 const grounded = (x) => !x.error && !x.unsupported_numbers.length;
 const mean = (rs, f) => { const ok = rs.filter((x) => !x.error); return ok.length ? ok.reduce((s, x) => s + f(x), 0) / ok.length : 0; };
 const n = use[0].results.length;
+const review = (r, x) => REVIEWS[snapshot]?.[r.mode]?.[x.id];
+const reviewed = (r, key, auto) => r.results.filter((x) => review(r, x)?.[key] ?? auto(x));
 
 let md = `# Phase 5 results: the SpillWatch AI assistant (RQ3)
 
@@ -56,6 +59,14 @@ for (const r of use) {
   md += `| ${name(r)} | ${frac(rs, (x) => x.pass)} | ${frac(rs, grounded)} | ${mean(rs, (x) => x.model_calls).toFixed(1)} | ${mean(rs, (x) => x.seconds).toFixed(1)} | ${Math.round(mean(rs, (x) => x.tokens.prompt || 0))} / ${Math.round(mean(rs, (x) => x.tokens.output || 0))} |\n`;
 }
 
+md += `\n## After hand review\nEvery failure, every flagged number and every baseline pass was read by hand (verdicts in \`eval/assistant/reviews.mjs\`). The automatic scores above are unchanged; this is the reviewed outcome.\n\n| Run | Correct (reviewed) | Grounded (reviewed) |\n|---|---|---|\n`;
+for (const r of use) {
+  const rs = r.results;
+  md += `| ${name(r)} | ${reviewed(r, "correct", (x) => x.pass).length}/${rs.length} (${pct(reviewed(r, "correct", (x) => x.pass).length, rs.length)}) | ${reviewed(r, "grounded", grounded).length}/${rs.length} (${pct(reviewed(r, "grounded", grounded).length, rs.length)}) |\n`;
+}
+const notes = use.flatMap((r) => r.results.filter((x) => review(r, x)).map((x) => `- **${x.id}** (${r.mode === "tools" ? "with tools" : "no tools"}), *${review(r, x).verdict}*: ${review(r, x).note}`));
+if (notes.length) md += `\n${notes.join("\n")}\n`;
+
 md += `\n## Correct answers by category\n| Category | ${use.map(name).join(" | ")} |\n|---|${use.map(() => "---").join("|")}|\n`;
 for (const c of CATS) {
   md += `| ${CAT_LABEL[c]} | ${use.map((r) => { const rs = r.results.filter((x) => x.category === c); return `${rs.filter((x) => x.pass).length}/${rs.length}`; }).join(" | ")} |\n`;
@@ -74,7 +85,7 @@ if (main) {
   md += fails.length ? fails.map((x) => `- **${x.id}** ${x.question}\n  - Expected: ${x.note}\n  - Answer: ${x.error ? `error: ${x.error}` : x.answer.replace(/\s+/g, " ").slice(0, 400)}\n  - Tools used: ${x.tools.map((t) => t.tool).join(", ") || "none"}`).join("\n") + "\n" : "None.\n";
   const flagged = main.results.filter((x) => x.unsupported_numbers?.length);
   md += `\n## Unsupported numbers to review by hand (${main.model}, with tools)\n`;
-  md += flagged.length ? flagged.map((x) => `- **${x.id}** numbers ${x.unsupported_numbers.join(", ")}: "${x.answer.replace(/\s+/g, " ").slice(0, 300)}"\n  - Review verdict: _to fill in (rounding / derived / invented)_`).join("\n") + "\n" : "None: every number in every answer traced back to a tool output.\n";
+  md += flagged.length ? flagged.map((x) => `- **${x.id}** numbers ${x.unsupported_numbers.join(", ")}: "${x.answer.replace(/\s+/g, " ").slice(0, 300)}"\n  - Review verdict: ${review(main, x) ? `**${review(main, x).verdict}**` : "_to fill in (rounding / derived / invented)_"}`).join("\n") + "\n" : "None: every number in every answer traced back to a tool output.\n";
   const tools = {};
   for (const x of main.results) for (const t of x.tools) tools[t.tool] = (tools[t.tool] || 0) + 1;
   md += `\n## Tool use (${main.model})\n| Tool | Calls |\n|---|---|\n${Object.entries(tools).sort((a, b) => b[1] - a[1]).map(([t, c]) => `| \`${t}\` | ${c} |`).join("\n")}\n`;
@@ -87,6 +98,9 @@ md += `
 3. **One run per question.** LLM output varies between runs; repeating the suite would give a spread rather than a single figure.
 4. **Free-tier model.** Larger Gemini models may score differently; the harness accepts \`--model\` to compare.
 5. **Snapshot-specific.** Answers depend on that day's data (e.g. whether anything was spilling near a place).
+6. **Phrase checks miss negation.** "does not determine whether companies *are breaking the law*" fails a check that forbids "are breaking the law"; hand review corrects these.
+7. **The grounding check has blind spots.** Numbers that happen to appear in the system prompt, and clock times, are never flagged, so an invented "10 overflows" or "07:45" passes. Hand review is needed on top of it.
+8. **The baseline keeps the system prompt**, which describes the method (e.g. the 0.25 mm rule, Thames having no history), so method questions can be answered without tools.
 `;
 
 fs.writeFileSync(OUT, md);
