@@ -30,7 +30,7 @@ New computer or new account? Follow **[Setup from scratch](#setup-from-scratch)*
 | 2. Orchestration & quality | Scheduled collection, 11 data-quality checks, collector gaps, monitor status changes | ✅ Done |
 | 3. AI: suspicious-spill detection | Model of expected spilling given rainfall (AUC 0.927), evaluated against the dry-day rule. [Results](docs/results/phase3_dry_spill.md) | ✅ First version |
 | 4. AI: spill forecasting | 1–2 day spill risk; AUC 0.916 / 0.894 with real archived forecasts. [Results](docs/results/phase4_forecast.md) | ✅ First version |
-| 5. AI: river assistant | Gemini answering questions through five tools over the live data, with a test suite of 28 questions including trap questions. [Details](#assistant-phase-5) | 🚧 Built, evaluation pending |
+| 5. AI: river assistant | Gemini answering questions through five tools over the live data; 28/28 correct after hand review with tools vs 10/28 without, one invented figure. [Results](docs/results/phase5_assistant.md) | ✅ First version |
 | 6. Frontend | Live map: status now, AI-flagged unexpected spills with explanations, risk today/tomorrow, near-me search. [Live](https://mahum24.github.io/spillwatch-ai/) | ✅ First version |
 
 ## Architecture (Phase 1)
@@ -81,6 +81,8 @@ Answers cite overflows as `[[id]]`, which become "show on map" links, and every 
 **One implementation everywhere.** [`site/assistant/tools.js`](site/assistant/tools.js) (tools, prompt, request) and [`agent.js`](site/assistant/agent.js) (the tool loop) are shared by the website, the Worker and the evaluation harness.
 
 **Evaluation (RQ3).** [`eval/assistant/`](eval/assistant/) asks 28 questions in 7 categories (lookups, places, single sites, anomalies, forecasts, method, and *traps*: legality, swimming safety, next week, E. coli, an unknown company, a false premise, off-topic). Expected answers are computed from a frozen data snapshot with the same tool code. Each answer is scored for correctness and **grounding**: every number in it must appear in a tool output. The same questions run with no tools give the ungrounded baseline.
+
+**Result.** With tools: 27/28 correct automatically, 28/28 after hand review; 27/28 grounded. Without tools: 10/28 correct. The one grounding failure is a legality question the model correctly declined but padded with invented company figures without calling a tool. [Full results](docs/results/phase5_assistant.md)
 
 How to get a key, deploy the server and run the evaluation: see [Setup from scratch](#setup-from-scratch), steps 8–9.
 

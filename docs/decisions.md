@@ -160,3 +160,9 @@ Found its live feed (994 overflows), bringing coverage to all 9 English water an
 **Decision:** the assistant's Cloudflare Worker also has Cron Triggers that call GitHub's `workflow_dispatch` API on the intended schedule. GitHub's own `schedule:` stays as a fallback; the workflows' concurrency groups stop overlapping runs.
 **Why this option:** no extra service or account (the Worker already exists, and Cron Triggers are free); the token is fine-grained, limited to this repository and to Actions, stored as a Worker secret. An external cron website was the alternative but needs another account holding a token.
 **Risk:** the token expires; `/health` reports `scheduler_ready`, and the README explains renewal.
+
+### 2026-10-19 — Assistant evaluation (RQ3) and hand review
+**Result:** on the 11 Oct snapshot, `gemini-3.5-flash-lite` with tools answered 27/28 questions correctly by the automatic checks and 28/28 after hand review, with 27/28 grounded. The same model without tools answered 10/28 (lookups 0/5, unexpected spills 0/3, forecasts 0/3).
+**Hand review, not changed checks:** two "failures" (T1 in both modes) were correct refusals that the phrase check misread ("does not determine whether companies *are breaking the law*"), and one baseline "pass" (S3) invented a status time. The automatic checks were left as they were, so the scores are not tuned after seeing the answers; verdicts live in `eval/assistant/reviews.mjs` and the report shows both figures.
+**Finding:** grounding failures happen even with tools. In T1 the model answered without calling a tool and invented Severn Trent's 7-day figures (10 spilling, 40 spills, 336 hours; actual 1, 205, 165). The grounding check missed "10" because it appears in the system prompt ("10 km").
+**Follow-up options:** require a tool call before any company figure, or have the prompt tell the model to call `get_summary` for company questions; re-run the suite several times to measure variation.
