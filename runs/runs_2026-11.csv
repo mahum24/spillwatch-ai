@@ -2731,3 +2731,4 @@ snapshot_at,overflows,rows_written,keyframe,companies
 2026-11-28T13:38:06+00:00,12034,1747,False,"{""anglian"": 1438, ""northumbrian"": 1578, ""severn_trent"": 2417, ""south_west"": 1342, ""southern"": 1004, ""thames"": 573, ""united_utilities"": 2255, ""wessex"": 1427}"
 2026-11-28T13:53:03+00:00,9617,1351,False,"{""anglian"": 1438, ""northumbrian"": 1578, ""south_west"": 1342, ""southern"": 1004, ""thames"": 573, ""united_utilities"": 2255, ""wessex"": 1427}"
 2026-11-28T14:08:04+00:00,14212,2201,False,"{""anglian"": 1438, ""northumbrian"": 1578, ""severn_trent"": 2417, ""south_west"": 1342, ""southern"": 1004, ""thames"": 573, ""united_utilities"": 2255, ""wessex"": 1427, ""yorkshire"": 2178}"
+2026-11-28T14:22:58+00:00,14212,2964,False,"{""anglian"": 1438, ""northumbrian"": 1578, ""severn_trent"": 2417, ""south_west"": 1342, ""southern"": 1004, ""thames"": 573, ""united_utilities"": 2255, ""wessex"": 1427, ""yorkshire"": 2178}"
